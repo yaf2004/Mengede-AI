@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mengede</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --blue:#2563eb; --blue-dark:#1d4ed8; --blue-light:#eff6ff;
+    --bg:#f7f8fb;
+    color-scheme: light;
+  }
+  *{font-family:'Inter',system-ui,sans-serif;}
+  body{background:var(--bg);}
+  .icon{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:10px;color:#4b5563;font-size:14.5px;font-weight:500;cursor:pointer;transition:background .15s, color .15s;}
+  .nav-item:hover{background:#f3f4f6;}
+  .nav-item.active{background:var(--blue-light);color:var(--blue);}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;}
+  .pill{border-radius:999px;padding:6px 16px;font-size:13.5px;font-weight:500;border:1px solid #e5e7eb;color:#374151;cursor:pointer;white-space:nowrap;}
+  .pill.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .btn-primary{background:var(--blue);color:#fff;font-weight:600;border-radius:10px;transition:background .15s;}
+  .btn-primary:hover{background:var(--blue-dark);}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:99px;}
+  .page{display:none;}
+  .page.active{display:block;}
+  .chat-bubble-user{background:var(--blue);color:#fff;border-radius:16px 16px 4px 16px;}
+  .chat-bubble-ai{background:#fff;border:1px solid #e5e7eb;border-radius:16px 16px 16px 4px;}
+  @media (max-width: 860px){
+    #sidebar{transform:translateX(-100%);}
+    #sidebar.open{transform:translateX(0);}
+    main{margin-left:0 !important;}
+  }
+
+  /* ---------------- DARK MODE ---------------- */
+  html.dark body{background:#0b1220;color:#e2e8f0;}
+  html.dark #sidebar{background:#0f172a !important;border-color:#1e293b !important;}
+  html.dark .card,
+  html.dark [class*="bg-white"]{background:#141c2e !important;border-color:#243040 !important;}
+  html.dark .nav-item{color:#94a3b8;}
+  html.dark .nav-item:hover{background:#1e293b;}
+  html.dark .nav-item.active{background:#173257;color:#7ab0ff;}
+  html.dark input, html.dark select, html.dark textarea{background:#141c2e !important;border-color:#243040 !important;color:#e2e8f0 !important;}
+  html.dark input::placeholder, html.dark textarea::placeholder{color:#64748b;}
+  html.dark .pill{background:#141c2e;border-color:#243040;color:#cbd5e1;}
+  html.dark .pill.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  html.dark .chat-bubble-ai{background:#141c2e;border-color:#243040;}
+  html.dark .text-slate-900{color:#f1f5f9 !important;}
+  html.dark .text-slate-700{color:#cbd5e1 !important;}
+  html.dark .text-slate-600{color:#b8c2d0 !important;}
+  html.dark .text-slate-500{color:#94a3b8 !important;}
+  html.dark .text-slate-400{color:#64748b !important;}
+  html.dark .text-slate-300{color:#475569 !important;}
+  html.dark .border-slate-200{border-color:#243040 !important;}
+  html.dark .border-slate-100{border-color:#1e293b !important;}
+  html.dark .border-dashed{border-color:#334155 !important;}
+  html.dark .bg-blue-50{background:#132a4d !important;}
+  html.dark .text-blue-600{color:#7ab0ff !important;}
+  html.dark .bg-emerald-50{background:#062a1c !important;}
+  html.dark .text-emerald-600{color:#6ee7b7 !important;}
+  html.dark .bg-amber-50{background:#3a2a06 !important;}
+  html.dark .text-amber-600{color:#fbbf24 !important;}
+  html.dark .bg-violet-50{background:#241245 !important;}
+  html.dark .text-violet-600, html.dark .text-violet-500{color:#c4b5fd !important;}
+  html.dark .bg-rose-50{background:#3d0d1c !important;}
+  html.dark .text-rose-600{color:#fda4af !important;}
+  html.dark .bg-slate-50{background:#0b1220 !important;}
+  html.dark .badge-streak{background:#3a2a06 !important;border-color:#5c4308 !important;color:#fbbf24 !important;}
+  html.dark .badge-xp{background:#132a4d !important;border-color:#1d3a63 !important;color:#7ab0ff !important;}
+  html.dark .badge-student{background:#132a4d !important;border-color:#1d3a63 !important;color:#7ab0ff !important;}
+  html.dark .badge-xp2{background:#062a1c !important;border-color:#0c3d28 !important;color:#6ee7b7 !important;}
+  html.dark .badge-tag{background:#1e293b !important;border-color:#334155 !important;color:#cbd5e1 !important;}
+  .theme-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:10px;background:#f3f4f6;cursor:pointer;font-size:13.5px;font-weight:500;color:#4b5563;margin-bottom:8px;}
+  html.dark .theme-toggle{background:#1e293b;color:#cbd5e1;}
+</style>
+</head>
+<body class="text-slate-900">
+
+<div id="mobileOverlay" class="fixed inset-0 bg-black/30 z-30 hidden" onclick="toggleSidebar(false)"></div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar" class="fixed top-0 left-0 h-screen w-64 bg-white border-r border-slate-200 flex flex-col z-40 transition-transform duration-200">
+  <div class="flex items-center gap-2 px-5 h-16 border-b border-slate-100 shrink-0">
+    <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white" id="logoIcon"></div>
+    <span class="text-lg font-extrabold tracking-tight">Mengede<span class="text-blue-600">.</span></span>
+  </div>
+
+  <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1" id="navList"></nav>
+
+  <div class="border-t border-slate-100 p-3">
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+      <span class="flex items-center gap-2"><span id="themeIcon"></span> <span id="themeLabel">Dark Mode</span></span>
+      <span id="themeSwitch" class="w-9 h-5 rounded-full bg-slate-300 relative transition-colors" style="flex-shrink:0">
+        <span id="themeKnob" class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"></span>
+      </span>
+    </div>
+    <div class="nav-item" style="color:#6b7280" onclick="toggleSidebar(false)">
+      <span class="icon-slot" data-icon="log-out"></span> Back to Home
+    </div>
+  </div>
+</aside>
+
+<!-- TOPBAR (mobile) -->
+<div class="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 flex items-center px-4 z-20">
+  <button onclick="toggleSidebar(true)" class="p-2 -ml-2"><span class="icon-slot" data-icon="menu"></span></button>
+  <span class="ml-2 font-bold">Mengede</span>
+</div>
+
+<main class="md:ml-64 mt-14 md:mt-0 min-h-screen">
+  <div class="max-w-6xl mx-auto px-5 md:px-10 py-8" id="content"></div>
+</main>
+
+<script>
+/* ---------------- ICONS (lucide-style inline SVG paths) ---------------- */
+const ICON_PATHS = {
+  home: '<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/>',
+  sparkles: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+  'log-out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  menu: '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  flame: '<path d="M8.5 14.5A4.5 4.5 0 0 0 13 19a4.5 4.5 0 0 0 4.5-4.5c0-2-1-3-1-5 0 0-1 1-2 1 0-2-1.5-4-3-5 0 1.5-1 3-2.5 4.5C7.5 11.5 6 12.5 6 15a4.5 4.5 0 0 0 2.5 4"/>',
+  send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  'graduation-cap': '<path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/>',
+  briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  award: '<circle cx="12" cy="8" r="6"/><path d="M15.5 13.3 17 22l-5-3-5 3 1.5-8.7"/>',
+  'book-open': '<path d="M2 4h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2Z"/><path d="M22 4h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/>',
+  'bar-chart': '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  lightbulb: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a6 6 0 0 0-4 10.5c.7.6 1 1.3 1 2.5h6c0-1.2.3-1.9 1-2.5A6 6 0 0 0 12 2Z"/>',
+  'file-text': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>',
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  'thumbs-up': '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h1a2 2 0 0 1 2 2Z"/>',
+  'message-circle': '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>',
+  'map-pin': '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+};
+function ic(name, cls){ return `<svg class="icon ${cls||''}" viewBox="0 0 24 24">${ICON_PATHS[name]||''}</svg>`; }
+document.querySelectorAll('[data-icon]').forEach(el=> el.innerHTML = ic(el.dataset.icon));
+document.getElementById('logoIcon').innerHTML = ic('graduation-cap','w-5 h-5');
+
+function toggleSidebar(open){
+  document.getElementById('sidebar').classList.toggle('open', open);
+  document.getElementById('mobileOverlay').classList.toggle('hidden', !open);
+}
+
+/* ---------------- NAV ---------------- */
+const NAV = [
+  {id:'dashboard', label:'Dashboard', icon:'home'},
+  {id:'assistant', label:'Pathway Assistant', icon:'sparkles'},
+  {id:'mentors', label:'Mentors', icon:'calendar'},
+  {id:'community', label:'Community', icon:'users'},
+  {id:'profile', label:'Profile', icon:'user'},
+];
+const navList = document.getElementById('navList');
+NAV.forEach(n=>{
+  const el = document.createElement('div');
+  el.className = 'nav-item';
+  el.dataset.page = n.id;
+  el.innerHTML = `${ic(n.icon)} <span>${n.label}</span>`;
+  el.onclick = ()=> goto(n.id);
+  navList.appendChild(el);
+});
+
+/* ---------------- STATE (mock personalization) ---------------- */
+const state = {
+  profile: {
+    name: 'Student',
+    interests: 'AI, Robotics, Entrepreneurship',
+    goals: '',
+    skills: ['Python basics', 'Public speaking'],
+    completion: 65,
+  },
+};
+
+/* ---------------- FEED DATA (mocked "AI-curated" suggestions) ---------------- */
+const FEED = [
+  {type:'stat', icon:'bar-chart', color:'blue', title:'Software & IT roles are up 18% in Addis Ababa this year',
+   body:'Based on your interest in AI and robotics, demand for junior software and data roles has grown fastest among tech fields tracked this year.'},
+  {type:'university', icon:'graduation-cap', color:'emerald', title:'Addis Ababa Science & Technology University — Robotics & Mechatronics',
+   body:'A strong technical fit for your interests, with active robotics clubs and industry partnerships. Public university, Addis Ababa.'},
+  {type:'opportunity', icon:'briefcase', color:'amber', title:'Entry paths into entrepreneurship without a business degree',
+   body:'Several accelerator and incubator programs in Ethiopia accept technical founders directly — no business background required.'},
+  {type:'resource', icon:'book-open', color:'violet', title:'Free intro robotics & AI courses worth starting with',
+   body:'A curated shortlist of beginner-friendly, no-cost courses that match your stated interests and current skill level.'},
+  {type:'scholarship', icon:'award', color:'rose', title:'Scholarships open to technical & entrepreneurial students',
+   body:'A few active scholarship programs currently accepting applications from students with your profile.'},
+];
+const FEED_COLORS = {
+  blue:'bg-blue-50 text-blue-600', emerald:'bg-emerald-50 text-emerald-600',
+  amber:'bg-amber-50 text-amber-600', violet:'bg-violet-50 text-violet-600',
+  rose:'bg-rose-50 text-rose-600',
+};
+const FEED_LABELS = {stat:'Local insight', university:'University match', opportunity:'Opportunity', resource:'Resource', scholarship:'Scholarship'};
+
+/* ---------------- PAGE RENDERERS ---------------- */
+function renderDashboard(){
+  const feedCards = FEED.map(f=>`
+    <div class="card p-5 flex gap-4">
+      <div class="w-11 h-11 rounded-xl ${FEED_COLORS[f.color]} flex items-center justify-center shrink-0">${ic(f.icon)}</div>
+      <div class="min-w-0">
+        <div class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">${FEED_LABELS[f.type]}</div>
+        <div class="font-semibold text-slate-900 mb-1">${f.title}</div>
+        <div class="text-sm text-slate-500 leading-relaxed">${f.body}</div>
+      </div>
+    </div>`).join('');
+
+  return `
+  <div class="flex items-start justify-between flex-wrap gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl font-extrabold">Welcome back, ${state.profile.name}!</h1>
+      <p class="text-slate-500 mt-1">Here's what's shaping up on your pathway today.</p>
+    </div>
+    <div class="flex gap-2">
+      <span class="pill badge-streak" style="background:#fff7ed;border-color:#fed7aa;color:#c2410c">${ic('flame')} 7 Day Streak</span>
+      <span class="pill badge-xp" style="background:var(--blue-light);border-color:#bfdbfe;color:var(--blue)">${ic('zap')} 1,250 XP</span>
+    </div>
+  </div>
+
+  <div class="rounded-2xl p-6 mb-8 text-white" style="background:linear-gradient(135deg,#2563eb,#1d4ed8)">
+    <div class="flex items-start justify-between flex-wrap gap-4">
+      <div>
+        <div class="font-bold text-lg mb-1">Complete Your Profile</div>
+        <div class="text-blue-100 text-sm">Fill in your interests and goals so your feed gets sharper.</div>
+      </div>
+      <button onclick="goto('profile')" class="bg-white text-blue-700 font-semibold px-4 py-2 rounded-lg text-sm shrink-0">Complete Now →</button>
+    </div>
+    <div class="mt-4">
+      <div class="flex justify-between text-xs text-blue-100 mb-1"><span>Profile Completion</span><span>${state.profile.completion}%</span></div>
+      <div class="h-2 rounded-full bg-white/25"><div class="h-2 rounded-full bg-white" style="width:${state.profile.completion}%"></div></div>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-8 flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">${ic('sparkles')}</div>
+      <div>
+        <div class="font-semibold">Ask your Pathway Assistant</div>
+        <div class="text-sm text-slate-500">Get guidance on any path — school, work, or skills.</div>
+      </div>
+    </div>
+    <button onclick="goto('assistant')" class="btn-primary px-4 py-2 text-sm shrink-0">Open Assistant</button>
+  </div>
+
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-bold text-lg">Recommended for you</h2>
+    <span class="text-xs text-slate-400">Based on: ${state.profile.interests}</span>
+  </div>
+  <div class="grid md:grid-cols-2 gap-4">${feedCards}</div>
+  `;
+}
+
+const QUICK_ACTIONS = [
+  {icon:'compass', label:'Explore my interests'},
+  {icon:'bar-chart', label:'Show me local stats'},
+  {icon:'graduation-cap', label:'Compare pathways'},
+  {icon:'briefcase', label:'Find opportunities'},
+  {icon:'lightbulb', label:'Build a skill plan'},
+  {icon:'target', label:'Career guidance'},
+];
+let chatLog = [];
+function renderAssistant(){
+  const bubbles = chatLog.map(m=>`
+    <div class="flex ${m.role==='user'?'justify-end':'justify-start'} mb-3">
+      <div class="max-w-[80%] px-4 py-2.5 text-sm ${m.role==='user'?'chat-bubble-user':'chat-bubble-ai'}">${m.text}</div>
+    </div>`).join('');
+
+  return `
+  <div class="flex items-center gap-3 mb-6">
+    <div class="w-11 h-11 rounded-xl flex items-center justify-center text-white" style="background:linear-gradient(135deg,#7c3aed,#2563eb)">${ic('sparkles')}</div>
+    <div>
+      <div class="font-bold text-lg">Pathway Assistant</div>
+      <div class="text-sm text-slate-500">Your personal guide for school, work, and skills</div>
+    </div>
+  </div>
+
+  <div class="card p-4 md:p-6 flex flex-col" style="min-height:60vh">
+    <div id="chatBody" class="flex-1 overflow-y-auto mb-4" style="max-height:50vh">
+      ${chatLog.length ? bubbles : `
+      <div class="flex flex-col items-center justify-center text-center py-10">
+        <div class="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">${ic('sparkles','text-violet-500')}</div>
+        <div class="font-bold text-lg mb-1">How can I help you today?</div>
+        <div class="text-sm text-slate-500 mb-6">Ask about a path, a skill, an opportunity — anything on your mind.</div>
+        <div class="grid grid-cols-2 gap-3 w-full max-w-md">
+          ${QUICK_ACTIONS.map(q=>`
+            <button onclick="quickAsk('${q.label.replace(/'/g,"\\'")}')" class="flex items-center gap-2 px-3 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 hover:border-blue-300 hover:bg-blue-50 transition text-left">
+              ${ic(q.icon,'text-blue-500 shrink-0')} <span>${q.label}</span>
+            </button>`).join('')}
+        </div>
+      </div>`}
+    </div>
+    <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+      <input id="chatInput" type="text" placeholder="Ask anything about your path..." class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400" onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()" class="w-10 h-10 rounded-xl btn-primary flex items-center justify-center shrink-0">${ic('send')}</button>
+    </div>
+  </div>`;
+}
+function quickAsk(label){
+  chatLog.push({role:'user', text:label});
+  chatLog.push({role:'ai', text:`Here's what I'd suggest on "${label.toLowerCase()}" — (this is a UI placeholder; wire this up to your actual assistant logic).`});
+  goto('assistant');
+}
+function sendChat(){
+  const inp = document.getElementById('chatInput');
+  if(!inp.value.trim()) return;
+  chatLog.push({role:'user', text:inp.value});
+  chatLog.push({role:'ai', text:'(placeholder reply — connect this to your assistant backend)'});
+  inp.value='';
+  goto('assistant');
+  setTimeout(()=>{ const b=document.getElementById('chatBody'); if(b) b.scrollTop=b.scrollHeight; },0);
+}
+
+const COMMUNITY_CATS = ['All','General','Study Help','Career','Skills','Opportunities'];
+const POSTS = [
+  {initial:'A', color:'bg-blue-600', title:'Best way to start learning robotics with no prior background?', author:'Abebe T.', date:'9/15/2026',
+   body:"I'm interested in robotics but have zero engineering background. Where should I actually start?", likes:45, comments:23, tag:'Study Help'},
+  {initial:'M', color:'bg-rose-500', title:'Is entrepreneurship realistic without a business degree?', author:'Meron H.', date:'9/14/2026',
+   body:"Torn between trying to start something now vs. waiting until I have more formal training. What worked for others?", likes:67, comments:34, tag:'Career'},
+  {initial:'D', color:'bg-emerald-600', title:'Anyone tried the free AI courses linked in the assistant?', author:'Dawit M.', date:'9/12/2026',
+   body:'Curious which of the suggested free courses were actually worth the time.', likes:29, comments:11, tag:'Skills'},
+];
+function renderCommunity(){
+  const pills = COMMUNITY_CATS.map((c,i)=>`<span class="pill ${i===0?'active':''}">${c}</span>`).join('');
+  const posts = POSTS.map(p=>`
+    <div class="card p-5 mb-4">
+      <div class="flex items-start gap-3">
+        <div class="w-9 h-9 rounded-full ${p.color} text-white flex items-center justify-center font-semibold shrink-0">${p.initial}</div>
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold">${p.title}</div>
+          <div class="text-xs text-slate-400 mb-2">${p.author} · ${p.date}</div>
+          <div class="text-sm text-slate-600 mb-3">${p.body}</div>
+          <div class="flex items-center gap-4 text-sm text-slate-500">
+            <span class="flex items-center gap-1">${ic('thumbs-up','w-4 h-4')} ${p.likes}</span>
+            <span class="flex items-center gap-1">${ic('message-circle','w-4 h-4')} ${p.comments}</span>
+            <span class="pill badge-tag" style="padding:3px 10px;font-size:12px;background:#f3f4f6;border-color:#e5e7eb;color:#4b5563">${p.tag}</span>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  return `
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl font-extrabold">Community</h1>
+      <p class="text-slate-500 mt-1">Discuss, learn, and grow together</p>
+    </div>
+    <button class="btn-primary px-4 py-2.5 text-sm flex items-center gap-2">${ic('plus')} New Post</button>
+  </div>
+  <div class="relative mb-4">
+    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">${ic('search')}</span>
+    <input placeholder="Search discussions..." class="w-full border border-slate-200 rounded-xl pl-11 pr-4 py-3 text-sm outline-none focus:border-blue-400">
+  </div>
+  <div class="flex gap-2 flex-wrap mb-6">${pills}</div>
+  ${posts}`;
+}
+
+const MENTORS = [
+  {name:'Selam Girma', initial:'S', color:'bg-blue-600', role:'Robotics Engineer, AASTU Alumni', tags:['Robotics','AI'],
+   bio:'6 years building automation systems in Addis Ababa. Loves helping students find their first technical project.',
+   slots:['Wed 9/24 · 4:00 PM','Thu 9/25 · 2:00 PM','Sat 9/27 · 11:00 AM']},
+  {name:'Nathnael Worku', initial:'N', color:'bg-emerald-600', role:'Founder, early-stage startup', tags:['Entrepreneurship','Career'],
+   bio:'Started a company straight out of university with no business degree. Happy to talk through realistic first steps.',
+   slots:['Wed 9/24 · 6:30 PM','Fri 9/26 · 1:00 PM']},
+  {name:'Hana Tesfaye', initial:'H', color:'bg-rose-500', role:'Physics Lecturer', tags:['Academics','Study Skills'],
+   bio:'Helps students prepare for entrance exams and pick a realistic academic path based on their strengths.',
+   slots:['Thu 9/25 · 10:00 AM','Sat 9/27 · 3:00 PM']},
+];
+let bookings = [];
+function renderMentors(){
+  const cards = MENTORS.map((m,i)=>`
+    <div class="card p-5">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="w-11 h-11 rounded-full ${m.color} text-white flex items-center justify-center font-semibold shrink-0">${m.initial}</div>
+        <div class="min-w-0">
+          <div class="font-semibold">${m.name}</div>
+          <div class="text-sm text-slate-500">${m.role}</div>
+        </div>
+      </div>
+      <div class="flex gap-2 flex-wrap mb-3">${m.tags.map(t=>`<span class="pill badge-tag" style="padding:3px 10px;font-size:12px;background:#f3f4f6;border-color:#e5e7eb;color:#4b5563">${t}</span>`).join('')}</div>
+      <p class="text-sm text-slate-600 mb-4">${m.bio}</p>
+      <div class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Next availability</div>
+      <div class="text-sm text-slate-600 mb-4">${m.slots[0]} ${m.slots.length>1?`+ ${m.slots.length-1} more`:''}</div>
+      <button onclick="openBooking(${i})" class="btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2">${ic('calendar')} Book a Session</button>
+    </div>`).join('');
+
+  const bookedList = bookings.length ? `
+    <div class="mb-6">
+      <h2 class="font-bold text-lg mb-3">Your upcoming sessions</h2>
+      <div class="space-y-2">
+        ${bookings.map(b=>`
+        <div class="card p-4 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full ${b.color} text-white flex items-center justify-center text-sm font-semibold shrink-0">${b.initial}</div>
+            <div>
+              <div class="font-medium text-sm">${b.name}</div>
+              <div class="text-xs text-slate-500">${b.slot}</div>
+            </div>
+          </div>
+          <span class="pill badge-xp2" style="padding:3px 10px;font-size:12px;background:#ecfdf5;border-color:#a7f3d0;color:#047857">${ic('check','w-3.5 h-3.5')} Confirmed</span>
+        </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  return `
+  <h1 class="text-2xl font-extrabold">Mentors</h1>
+  <p class="text-slate-500 mt-1 mb-6">Book a one-on-one session with someone who's been where you're headed</p>
+  ${bookedList}
+  <div class="grid md:grid-cols-2 gap-4">${cards}</div>
+
+  <div id="bookingModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background:rgba(15,23,42,.5)">
+    <div class="card w-full max-w-md p-6" id="bookingModalBody"></div>
+  </div>`;
+}
+function openBooking(i){
+  const m = MENTORS[i];
+  const modal = document.getElementById('bookingModal');
+  document.getElementById('bookingModalBody').innerHTML = `
+    <div class="flex items-center justify-between mb-4">
+      <div class="font-bold text-lg">Book with ${m.name}</div>
+      <button onclick="closeBooking()" class="text-slate-400">${ic('x')}</button>
+    </div>
+    <div class="text-sm text-slate-500 mb-4">Choose an available time slot</div>
+    <div class="space-y-2 mb-5">
+      ${m.slots.map(s=>`
+      <button onclick="confirmBooking(${i}, '${s}')" class="w-full text-left px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium hover:border-blue-400 hover:bg-blue-50 transition flex items-center gap-2">
+        ${ic('calendar','w-4 h-4 text-blue-500')} ${s}
+      </button>`).join('')}
+    </div>
+    <button onclick="closeBooking()" class="w-full py-2.5 rounded-xl border border-slate-200 text-sm font-medium">Cancel</button>`;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+function closeBooking(){
+  const modal = document.getElementById('bookingModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+function confirmBooking(i, slot){
+  const m = MENTORS[i];
+  bookings.push({name:m.name, initial:m.initial, color:m.color, slot});
+  closeBooking();
+  goto('mentors');
+}
+
+function renderProfile(){
+  return `
+  <h1 class="text-2xl font-extrabold">My Profile</h1>
+  <p class="text-slate-500 mt-1 mb-6">Tell us about yourself to sharpen your recommendations</p>
+
+  <div class="card p-5 mb-6 flex items-center gap-4">
+    <div class="relative">
+      <div class="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl font-bold">S</div>
+      <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500">${ic('camera','w-3.5 h-3.5')}</div>
+    </div>
+    <div>
+      <div class="font-bold text-lg">${state.profile.name}</div>
+      <div class="text-sm text-slate-500">student@example.com</div>
+      <div class="flex gap-2 mt-1.5">
+        <span class="pill badge-student" style="padding:3px 10px;font-size:12px;background:var(--blue-light);border-color:#bfdbfe;color:var(--blue)">Student</span>
+        <span class="pill badge-xp2" style="padding:3px 10px;font-size:12px;background:#ecfdf5;border-color:#a7f3d0;color:#047857">1,250 XP</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-6">
+    <div class="flex items-center gap-2 font-bold mb-4">${ic('user','text-blue-500')} Personal Information</div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div><label class="text-sm font-medium text-slate-600 mb-1 block">Full Name</label><input placeholder="Your full name" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400"></div>
+      <div><label class="text-sm font-medium text-slate-600 mb-1 block">Email</label><input placeholder="your@email.com" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400"></div>
+      <div><label class="text-sm font-medium text-slate-600 mb-1 block">Phone</label><input placeholder="+251 9XX XXX XXX" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400"></div>
+      <div><label class="text-sm font-medium text-slate-600 mb-1 block">Region</label>
+        <select class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 text-slate-400"><option>Select region</option></select></div>
+      <div><label class="text-sm font-medium text-slate-600 mb-1 block">City</label><input placeholder="Your city" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400"></div>
+      <div><label class="text-sm font-medium text-slate-600 mb-1 block">Education Level</label>
+        <select class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 text-slate-400"><option>Select level</option></select></div>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-6">
+    <div class="flex items-center gap-2 font-bold mb-4">${ic('compass','text-blue-500')} Interests &amp; Skills</div>
+    <div class="mb-4">
+      <label class="text-sm font-medium text-slate-600 mb-1 block">Interests</label>
+      <input value="${state.profile.interests}" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400">
+    </div>
+    <div class="mb-4">
+      <label class="text-sm font-medium text-slate-600 mb-1 block">Goals</label>
+      <textarea placeholder="Describe what you're working toward..." class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 h-24"></textarea>
+    </div>
+    <div>
+      <label class="text-sm font-medium text-slate-600 mb-1 block">Skills</label>
+      <input placeholder="e.g. Python basics, public speaking..." class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400">
+    </div>
+  </div>
+
+  <div class="card p-5 mb-6">
+    <div class="flex items-center gap-2 font-bold mb-4">${ic('file-text','text-blue-500')} Resume &amp; Documents</div>
+    <div class="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center py-10 text-center">
+      <div class="text-slate-300 mb-3">${ic('upload','w-7 h-7')}</div>
+      <div class="font-medium mb-1">Upload your resume</div>
+      <div class="text-xs text-slate-400 mb-4">PDF, DOC up to 5MB</div>
+      <button class="border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium">Choose File</button>
+    </div>
+  </div>
+
+  <button class="btn-primary w-full py-3 flex items-center justify-center gap-2">${ic('save')} Save Profile</button>
+  `;
+}
+
+/* ---------------- ROUTER ---------------- */
+const RENDERERS = {dashboard: renderDashboard, assistant: renderAssistant, mentors: renderMentors, community: renderCommunity, profile: renderProfile};
+function goto(page){
+  document.getElementById('content').innerHTML = RENDERERS[page]();
+  document.querySelectorAll('.nav-item[data-page]').forEach(el=> el.classList.toggle('active', el.dataset.page===page));
+  toggleSidebar(false);
+  window.scrollTo(0,0);
+  location.hash = page;
+}
+window.addEventListener('hashchange', ()=>{
+  const p = location.hash.replace('#','');
+  if(RENDERERS[p]) goto(p);
+});
+goto(RENDERERS[location.hash.replace('#','')] ? location.hash.replace('#','') : 'dashboard');
+
+/* ---------------- THEME ---------------- */
+function applyTheme(dark){
+  document.documentElement.classList.toggle('dark', dark);
+  document.getElementById('themeIcon').innerHTML = ic(dark?'moon':'sun','w-4 h-4');
+  document.getElementById('themeLabel').textContent = dark ? 'Dark Mode' : 'Light Mode';
+  const sw = document.getElementById('themeSwitch'), knob = document.getElementById('themeKnob');
+  sw.style.background = dark ? '#2563eb' : '#cbd5e1';
+  knob.style.transform = dark ? 'translateX(16px)' : 'translateX(0)';
+}
+function toggleTheme(){
+  const dark = !document.documentElement.classList.contains('dark');
+  applyTheme(dark);
+  try{ localStorage.setItem('mengede-theme', dark ? 'dark' : 'light'); }catch(e){}
+}
+(function initTheme(){
+  let saved = null;
+  try{ saved = localStorage.getItem('mengede-theme'); }catch(e){}
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved ? saved === 'dark' : prefersDark);
+})();
+</script>
+</body>
+</html>
