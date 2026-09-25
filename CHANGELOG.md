@@ -34,10 +34,3 @@
 - docs: updated both READMEs to describe the MongoDB setup and the real links.et integration,
   including its async/retry behavior and the providers whose amount field is confirmed.
 
-### Notes
-
-- Do NOT commit real secrets. `GEMINI_API_KEY` and `LINKS_ET_API_KEY` were used only in the
-  running processes; neither is present in the repository files.
-- Amount verification is confirmed for six providers only (telebirr, CBE PDF, CBE mobile JSON,
-  Zemen, Bank of Abyssinia, Awash) — see `lib/receiptParsing.js`. Other supported banks are still
-  confirmed by the bank itself, just not amount-checked yet.
