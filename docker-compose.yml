@@ -1,16 +1,14 @@
 version: '3.8'
 services:
   db:
-    image: postgres:15
+    image: mongo:7
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: mengede_dev
+      MONGO_INITDB_DATABASE: mengede_dev
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data:/data/db
 
 volumes:
   db_data:
