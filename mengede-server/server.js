@@ -21,6 +21,8 @@ app.use(express.json());
 app.use('/api/verify-receipt', verifyReceiptRouter);
 import testGeminiRouter from './routes/testGemini.js';
 app.use('/api/test/gemini', testGeminiRouter);
+import linksEtRouter from './routes/linksEt.js';
+app.use('/api/links', linksEtRouter);
 
 // --- Mock Voxide SDK endpoints for local dev ---------------------------------
 app.get('/api/sdk/init', (_req, res) => {
