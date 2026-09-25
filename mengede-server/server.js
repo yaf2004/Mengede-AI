@@ -1,82 +1,43 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import { connectMongo, isMongoConfigured } from './lib/mongo.js';
 import verifyReceiptRouter from './routes/verifyReceipt.js';
-import { WebSocketServer } from 'ws';
-import fs from 'fs';
-import path from 'path';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
-import { interact } from './lib/gemini.js';
+import bookingsRouter from './routes/bookings.js';
+import mentorsRouter from './routes/mentors.js';
+import linksEtRouter from './routes/linksEt.js';
+import dataRouter from './routes/data.js';
 
-// Database must be configured via DATABASE_URL. We do not run migrations automatically.
-if (!process.env.DATABASE_URL) {
-	console.warn('WARNING: DATABASE_URL is not set. Database features are disabled.');
+if (!isMongoConfigured()) {
+  console.warn('WARNING: MONGODB_URI is not set. Database-backed routes (/api/data/*, bookings, receipt de-dup) will fail until it is.');
+} else {
+  // Connect eagerly at boot so the first request isn't slowed down waiting on it, and so a bad
+  // connection string fails loudly on startup instead of on first use.
+  connectMongo().catch((err) => {
+    console.error('Failed to connect to MongoDB:', err.message);
+  });
 }
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/verify-receipt', verifyReceiptRouter);
-import testGeminiRouter from './routes/testGemini.js';
-app.use('/api/test/gemini', testGeminiRouter);
-import linksEtRouter from './routes/linksEt.js';
+// Every payment-verification call can spend the links.et plan's verification quota, so cap
+// attempts per client IP.
+app.use('/api/verify-receipt', rateLimit({
+  windowMs: 60_000,
+  limit: Number(process.env.VERIFY_RATE_LIMIT) || 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({ ok: false, error: 'Too many attempts. Wait a minute and try again.' }),
+}), verifyReceiptRouter);
+app.use('/api/bookings', bookingsRouter);
+app.use('/api/mentors', mentorsRouter);
 app.use('/api/links', linksEtRouter);
+app.use('/api/data', dataRouter);
 
-// --- Mock Voxide SDK endpoints for local dev ---------------------------------
-app.get('/api/sdk/init', (_req, res) => {
-	// Minimal init response the frontend SDK expects
-	return res.json({
-		ok: true,
-		config: {
-			agent: { language: 'en-US' },
-			appearance: {},
-		},
-	});
-});
-
-app.post('/api/sdk/manifest', (req, res) => {
-	// Accept manifest sync requests; respond 200 so the SDK proceeds.
-	return res.json({ ok: true });
-});
-
-// Lightweight WebSocket upgrade handling for /api/sdk/live
-const server = app.listen; // placeholder to satisfy linter
-
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, mongoConfigured: isMongoConfigured() }));
 
 const PORT = process.env.PORT || 4000;
-const httpServer = app.listen(PORT, () => {
-	console.log(`Mengede API listening on http://localhost:${PORT}`);
-
-	// Attach a simple WebSocket server on the same HTTP server for /api/sdk/live
-	const wss = new WebSocketServer({ server: httpServer, path: '/api/sdk/live' });
-	wss.on('connection', (ws) => {
-		// Send a ready message and echo text messages back as 'text' events
-		ws.send(JSON.stringify({ type: 'ready', sessionId: 'local-session' }));
-		ws.on('message', (msg) => {
-			// For local testing, just echo incoming messages as text events
-			try {
-				const parsed = JSON.parse(msg.toString());
-				if (parsed.type === 'input') {
-					ws.send(JSON.stringify({ type: 'text', text: `Echo: ${parsed.text || ''}` }));
-				}
-			} catch {
-				ws.send(JSON.stringify({ type: 'text', text: `Echo (raw): ${msg.toString()}` }));
-			}
-		});
-	});
-
-	// Simple test route to exercise Gemini client (returns simulated if GEMINI_API_KEY missing)
-	app.post('/api/test/gemini', async (req, res) => {
-		const text = req.body?.text || 'Hello from Mengede';
-		try {
-			const out = await interact({ input: text });
-			return res.json(out);
-		} catch (err) {
-			console.error('Gemini test error', err);
-			return res.status(500).json({ ok: false, error: String(err) });
-		}
-	});
-});
+app.listen(PORT, () => console.log(`Mengede API listening on http://localhost:${PORT}`));

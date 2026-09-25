@@ -1,25 +1,62 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '../lib/icons.jsx';
 import { rateLabel } from '../data/mentors.js';
-import { verifyReceipt as verifyReceiptApi } from '../lib/api.js';
+import { verifyReceipt as verifyReceiptApi, createBooking, getMentorPayment, getMentorTakenSlots } from '../lib/api.js';
 import { useToast } from '../context/ToastContext.jsx';
 
 export default function BookingModal({ mentor, onClose, onConfirm }) {
+  const [openSlots, setOpenSlots] = useState(mentor.slots);
+  const [slotsLoaded, setSlotsLoaded] = useState(false);
   const [slot, setSlot] = useState(null);
   const [view, setView] = useState('pick'); // 'pick' | 'pay'
+  const [pickBusy, setPickBusy] = useState(null); // which slot is being booked, if any
+  const [pickError, setPickError] = useState('');
+  const [payment, setPayment] = useState(null); // { configured, rate, method, account, holderName }
+  const [paymentError, setPaymentError] = useState('');
   const [receipt, setReceipt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [verified, setVerified] = useState(null); // { bank, amount, reference }
+  const [verified, setVerified] = useState(null); // { bank, amount, reference, booking }
   const flash = useToast();
 
   const isPaid = mentor.rate > 0;
 
-  function pickSlot(s) {
-    setSlot(s);
-    if (isPaid) setView('pay');
-    else onConfirm({ mentor, slot: s, paid: false });
+  // Slots are a shared calendar — refresh which ones are already taken (by anyone) on open.
+  useEffect(() => {
+    let live = true;
+    getMentorTakenSlots(mentor.id).then(res => {
+      if (!live) return;
+      const taken = res.ok ? new Set(res.taken) : new Set();
+      setOpenSlots(mentor.slots.filter(s => !taken.has(s)));
+      setSlotsLoaded(true);
+    });
+    return () => { live = false; };
+  }, [mentor]);
+
+  async function pickSlot(s) {
+    if (isPaid) { setSlot(s); setView('pay'); return; }
+    setPickBusy(s);
+    setPickError('');
+    const res = await createBooking(mentor.id, s);
+    setPickBusy(null);
+    if (!res.ok) {
+      if (res.code === 'slot_already_booked') setOpenSlots(list => list.filter(x => x !== s));
+      setPickError(res.error || 'Could not book that session. Try again.');
+      return;
+    }
+    onConfirm({ ...res.booking, mentor });
   }
+
+  useEffect(() => {
+    if (view !== 'pay') return;
+    let live = true;
+    getMentorPayment(mentor.id).then(res => {
+      if (!live) return;
+      if (res.ok) setPayment(res);
+      else setPaymentError(res.error || 'Could not load payment details right now.');
+    });
+    return () => { live = false; };
+  }, [view, mentor]);
 
   async function runVerify() {
     const ref = receipt.trim();
@@ -28,12 +65,9 @@ export default function BookingModal({ mentor, onClose, onConfirm }) {
     setBusy(true);
     setError('');
     try {
-      const result = await verifyReceiptApi(ref, mentor.rate);
-      if (result.ok) {
-        setVerified(result);
-      } else {
-        setError(result.error || 'Could not verify that receipt. Double-check it and try again.');
-      }
+      const result = await verifyReceiptApi(mentor.id, slot, ref);
+      if (result.ok) setVerified(result);
+      else setError(result.error || 'Could not verify that receipt. Double-check it and try again.');
     } catch {
       setError('Could not reach the verification service. Try again in a moment.');
     } finally {
@@ -42,11 +76,13 @@ export default function BookingModal({ mentor, onClose, onConfirm }) {
   }
 
   function confirmPaidBooking() {
-    onConfirm({ mentor, slot, paid: true, bank: verified.bank, reference: verified.reference, amount: verified.amount });
+    // The booking was already created by /api/verify-receipt; this just hands it to the UI.
+    onConfirm({ ...verified.booking, mentor });
   }
 
   function copyAccount() {
-    navigator.clipboard?.writeText(mentor.pay.account).then(() => flash('Account number copied'));
+    if (!payment?.account) return;
+    navigator.clipboard?.writeText(payment.account).then(() => flash('Account number copied'));
   }
 
   return (
@@ -60,9 +96,13 @@ export default function BookingModal({ mentor, onClose, onConfirm }) {
         {view === 'pick' && (
           <div className="space-y-2">
             <div className="text-sm text-slate-500 mb-3">Pick a time that works for you.</div>
-            {mentor.slots.map(s => (
-              <button key={s} onClick={() => pickSlot(s)} className="pill glass w-full flex items-center gap-2 justify-start text-left" style={{ padding: '10px 16px' }}>
-                <Icon name="clock" className="w-4 h-4" /> {s}
+            {pickError && <div className="text-sm text-rose-600 mb-2">{pickError}</div>}
+            {slotsLoaded && openSlots.length === 0 && (
+              <div className="text-sm text-slate-500">No open times left — check back soon.</div>
+            )}
+            {openSlots.map(s => (
+              <button key={s} onClick={() => pickSlot(s)} disabled={pickBusy === s} className="pill glass w-full flex items-center gap-2 justify-start text-left" style={{ padding: '10px 16px' }}>
+                <Icon name="clock" className="w-4 h-4" /> {pickBusy === s ? 'Booking…' : s}
               </button>
             ))}
           </div>
@@ -79,17 +119,29 @@ export default function BookingModal({ mentor, onClose, onConfirm }) {
               </div>
             </div>
 
-            {!verified && (
+            {paymentError && <div className="text-sm text-rose-600 mb-2">{paymentError}</div>}
+
+            {!payment && !paymentError && (
+              <div className="text-sm text-slate-500 mb-4">Loading payment details…</div>
+            )}
+
+            {payment && !payment.configured && (
+              <div className="card p-4 mb-4 text-sm text-slate-600">
+                Payments for {mentor.name} aren't set up yet. Please check back soon.
+              </div>
+            )}
+
+            {payment && payment.configured && !verified && (
               <>
                 <div className="card p-4 mb-4">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Pay via {mentor.pay.method}</div>
+                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Pay via {payment.method}</div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono font-semibold text-sm">{mentor.pay.account}</span>
+                    <span className="font-mono font-semibold text-sm">{payment.account}</span>
                     <button onClick={copyAccount} className="pill glass" style={{ padding: '4px 12px', fontSize: 12 }}>
                       <Icon name="external" className="w-3.5 h-3.5" /> Copy
                     </button>
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">Pay {rateLabel(mentor)} in your bank or wallet app, then paste the receipt link or reference below.</div>
+                  <div className="text-xs text-slate-500 mt-2">Pay {rateLabel(mentor)} to {payment.holderName} in your bank or wallet app, then paste the receipt link or reference below.</div>
                 </div>
 
                 <label className="block text-sm font-medium mb-1">Receipt link or reference</label>

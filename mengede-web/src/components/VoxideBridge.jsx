@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppState } from '../context/AppStateContext.jsx';
+import { useSettings } from '../context/SettingsContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { ai, host, initVoxide } from '../lib/voxide.js';
 
@@ -20,22 +21,26 @@ const dedupe = (list) => {
 export default function VoxideBridge() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { profile, setProfile, bookings, addBooking } = useAppState();
+  const { profile, setProfile, addBooking } = useAppState();
+  const { settings } = useSettings();
   const flash = useToast();
 
   useEffect(() => { initVoxide(); }, []);
+  // Sets the language the agent starts a session in. It only takes effect before the
+  // dashboard's own default is applied (or overrides it if set again later) — the live
+  // conversation's actual language still ultimately depends on the agent config in the
+  // Voxide dashboard, so confirm this by actually testing a session in each language.
+  useEffect(() => { ai.setLanguage(settings.lang === 'am' ? 'am-ET' : 'en-US'); }, [settings.lang]);
   useEffect(() => { ai.setActiveRoute(pathname); }, [pathname]);
 
   useEffect(() => {
     host.navigate = navigate;
-    host.getBookings = () => bookings;
     // The agent sees this every turn. First name and contact details are deliberately left out.
     host.getState = () => ({
       currentPage: pathname,
       interests: profile.interests,
       goals: profile.goals,
       skills: profile.skills,
-      bookedSessions: bookings.map(b => `${b.mentor.name}, ${b.slot}`),
     });
     host.updateProfile = ({ interests, skills, goals }) => {
       const next = {
@@ -48,12 +53,14 @@ export default function VoxideBridge() {
       flash('Profile updated');
       return { interests: next.interests, skills: next.skills, goals: next.goals };
     };
+    // By the time this is called the booking is already persisted server-side (see
+    // bookMentorSession in lib/voxide.js) — this just updates what the UI shows.
     host.addBooking = (booking) => {
       addBooking(booking);
       flash('Session booked');
     };
     return () => { Object.keys(host).forEach(k => { host[k] = null; }); };
-  }, [navigate, pathname, profile, setProfile, bookings, addBooking, flash]);
+  }, [navigate, pathname, profile, setProfile, addBooking, flash]);
 
   return null;
 }

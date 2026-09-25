@@ -6,7 +6,7 @@ owns payment verification.
 ```
 mengede/
 ├── mengede-web/      React + Vite + Tailwind v4 frontend
-└── mengede-server/   Express backend (mock receipt verification via Links.et)
+└── mengede-server/   Express backend (real Links.et receipt verification, MongoDB data API)
 ```
 
 ## Running it
@@ -31,24 +31,25 @@ override per environment. In the Voxide dashboard: set the agent language and pr
 your deployed domain to the whitelist (`localhost` always works). Microphone access needs HTTPS
 when deployed.
 
-## Optional: Postgres, Gemini, and Links.et
+## Backend setup: MongoDB, Gemini, and Links.et
 
-These are scaffolded in `mengede-server` but not required to run the app day-to-day.
+`mengede-server` needs these to do real work — the frontend still runs without them, but
+receipt verification and the data API won't.
 
-- **Postgres (Drizzle):** copy the root `.env.example` to `.env` and set `DATABASE_URL` (a local
-  Docker Postgres via `docker-compose up -d db`, or Neon/hosted Postgres both work — use
-  `DATABASE_URL_DIRECT` for the unpooled connection Neon recommends for migrations). Then, from
-  `mengede-server`: `npm run db:generate` to (re)generate migrations and `npm run db:migrate` to
-  apply them. See `mengede-server/README.md`. Nothing in the app reads from this database yet —
-  the schema and migration exist, but no route queries them.
-- **Gemini:** set `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`) to call the real Interactions
-  API from `lib/gemini.js`; without a key it returns a simulated response so local dev still
-  works. Reachable today only via the test endpoint (`POST /api/test/gemini`, or
-  `node test_gemini.js`) — no page in the frontend calls it yet.
-- **Links.et:** set `LINKS_ET_API_KEY` to enable `lib/linksEt.js`, a real client for
-  `POST /api/verify` and `POST /api/verify-image` against `https://links.et`, with retry/backoff
-  handling for rate limits and provider errors. It's mounted at `/api/links/*` and works standalone,
-  but the booking flow does **not** call it yet — see below.
+- **MongoDB (required for the data API and receipt de-duplication):** copy the root
+  `.env.example` to `.env` and set `MONGODB_URI` (a local Mongo via
+  `docker-compose up -d db`, or Atlas/any hosted Mongo). No migrations needed — Mongoose
+  creates collections and indexes on first use. See `mengede-server/README.md`.
+- **links.et (required for real receipt verification):** set `LINKS_ET_API_KEY` (starts with
+  `vk_live_`, from [links.et/dashboard/keys](https://links.et/dashboard/keys)). Without it,
+  `POST /api/verify-receipt` returns a clear 503 instead of silently accepting payments. See
+  `mengede-server/README.md` for how the client handles links.et's async/retry behavior.
+- **Gemini (optional):** set `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`) to call the real
+  Interactions API from `lib/gemini.js`; without a key it returns a simulated response so local
+  dev still works. Reachable via the test endpoint (`POST /api/test/gemini`, or
+  `node test_gemini.js`); real calls are now logged per-user, per-day to the `AiUsage`
+  collection in Mongo. No page in the frontend calls it yet — the Assistant page talks to
+  Voxide's own AI directly, not Gemini.
 
 ## What's real vs. mocked
 
@@ -56,31 +57,43 @@ These are scaffolded in `mengede-server` but not required to run the app day-to-
 - The whole frontend is componentized (Sidebar, Orb, GlassToggle, pages, contexts for
   theme/settings/app state) — no CDN Tailwind, built with `@tailwindcss/vite`.
 - The booking flow is fully wired: free mentors book instantly, paid mentors go through a
-  real `POST /api/verify-receipt` call to the Express backend — this is a genuine
-  frontend/backend round trip, not a client-side fake.
-- The backend validates empty/short input and rejects duplicate receipts (in-memory).
+  real `POST /api/verify-receipt` call to the Express backend, which calls the real
+  [links.et](https://links.et) API (`lib/linksEt.js`) to confirm the receipt directly with the
+  bank, and persists used receipts in MongoDB (`UsedReceipt`) so a receipt can't be reused even
+  across server restarts. **Requires `LINKS_ET_API_KEY` and `MONGODB_URI` to be set** — without
+  them the route returns a clear error instead of silently accepting payments.
 - The voice assistant is real: `@voxide/react` handles speech-to-text, the AI agent and voice
   replies. The agent can navigate the app, list mentors, book free sessions and save profile
   details through capabilities registered in `mengede-web/src/lib/voxide.js`.
 - Dark mode, voice settings, and language preference persist to `localStorage`.
-- `mengede-server/lib/linksEt.js` + `routes/linksEt.js` make genuine calls to the Links.et API
-  (`/api/verify`, `/api/verify-image`) when `LINKS_ET_API_KEY` is set, including its retry rules
-  for rate limits, `502`s, and provider downtime.
+- `mengede-server/lib/linksEt.js` makes genuine calls to the links.et API (`/api/verify`,
+  `/api/verify-image`) when `LINKS_ET_API_KEY` is set: it submits with `waitMs` and polls on a
+  `202` rather than holding a socket open through a slow bank, and follows links.et's retry
+  guidance (auto-retry `rate_limited`, but not `502`/busy-bank `400`, to protect view-limited
+  receipts like Siinqee's). `lib/receiptParsing.js` normalizes the per-provider `receipt` shape
+  into a plain `{ bank, amount }` for the six providers links.et's docs describe in detail;
+  other supported banks get a best-effort parse flagged as unconfirmed.
 - `mengede-server/lib/gemini.js` makes genuine calls to the Gemini Interactions API when
-  `GEMINI_API_KEY` is set, with a retry ladder for rate limits/server errors.
+  `GEMINI_API_KEY` is set, with a retry ladder for rate limits/server errors; real calls are
+  now tracked per-user, per-day in the `AiUsage` Mongo collection.
+- A real MongoDB-backed data API (`/api/data/*`, see `mengede-server/routes/data.js`) covers
+  student profiles, conversations + messages, quiz results, and study plans + tasks —
+  replacing the earlier Postgres/Drizzle scaffold that nothing actually read from.
 
 **Still mocked or not yet wired together (clearly commented at the point where it matters):**
-- `mengede-server/routes/verifyReceipt.js` — the route the booking flow actually calls — still
-  fabricates the bank name from the reference text and assumes the paid amount is correct; it
-  does not call the real Links.et client above, so **any 8+ character string currently counts
-  as a valid payment**. The exact call needed to replace it with `lib/linksEt.js`'s `verify()` is
-  written directly above the mock code. Do not present payment verification as working until
-  this route is switched over.
-- The duplicate-receipt check is an in-memory `Map` that resets on server restart. Swap it for a
-  real database table (the Postgres/Drizzle scaffold above) before this goes live.
-- The Drizzle schema and migration exist but haven't been run against a real database, and no
-  route reads or writes through them yet.
-- The Gemini test endpoint is real but isolated — nothing in the UI surfaces it yet.
+- Amount verification is only confirmed for six providers (telebirr, CBE PDF, CBE mobile JSON,
+  Zemen, Bank of Abyssinia, Awash) — the ones links.et's docs describe field-by-field. A receipt
+  from any other supported bank is still confirmed by the bank itself, but the booking flow
+  reports the amount as unverified (`amountVerified: false`) rather than guessing at field names
+  links.et hasn't documented yet.
+- If a verification takes unusually long (a busy or struggling bank), `/api/verify-receipt` can
+  return a `202 { pending: true }` after ~25s instead of a final result. The current frontend
+  doesn't retry on this automatically yet — that's the next piece to wire up.
+- Nothing in the frontend calls the new `/api/data/*` endpoints yet — profile, conversation,
+  quiz, and study-plan data are still only kept in frontend state/`localStorage`, not persisted
+  to Mongo, until the relevant pages are wired up to call them.
+- The Gemini test endpoint is real but isolated — nothing in the UI surfaces it yet; the
+  Assistant page talks to Voxide's own AI, not Gemini.
 - The two mentors' payment details in `mengede-web/src/data/mentors.js` (`pay.account`) are
   placeholders — replace with their real Telebirr/bank numbers.
 - The Voxide agent's own instructions (persona, language, honesty rules) live in the Voxide
