@@ -8,7 +8,3 @@
 - chore: `lib/db.js` DB helper and `drizzle.config.ts` + `drizzle/schema.ts`
 - docs: `.env.example` with `DATABASE_URL`/`GEMINI_API_KEY`, `docker-compose.yml` for local Postgres, and README note about migrations
 
-### Notes
-
-- Do NOT commit real secrets. `GEMINI_API_KEY` was used only in the running processes; it is not present in the repository files.
-- Migrations have been added but NOT executed; run them only after setting `DATABASE_URL`.
