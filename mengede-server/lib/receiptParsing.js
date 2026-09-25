@@ -80,6 +80,62 @@ function isMeteredSource(source) {
   return METERED_SOURCES.has(source);
 }
 
+const isCompletedStatus = (status) => /^(completed|success)$/i.test(String(status ?? '').trim());
+
+/**
+ * Who actually got paid, for the six sources with confirmed field shapes. This is what makes
+ * verification mean "this mentor was paid" rather than "some payment for this amount exists
+ * somewhere" — without it, a valid receipt for the right amount paid to a stranger would pass.
+ * Returns `{ receiverName, receiverAccount, completed }` with empty/`true` defaults for sources
+ * we don't recognize; callers should treat an unrecognized source as unverifiable, not as a pass.
+ */
+function extractReceiver(receipt) {
+  switch (receipt?.source) {
+    case 'telebirr-html':
+      return {
+        receiverName: receipt.creditedPartyName,
+        receiverAccount: receipt.creditedPartyAccountNo,
+        completed: isCompletedStatus(receipt.transactionStatus),
+      };
+    case 'cbe-pdf':
+    case 'mb-json':
+      return {
+        receiverName: receipt.receiverName,
+        receiverAccount: receipt.receiverAccount,
+        completed: true, // links.et already rejects (502) a CBE receipt that doesn't validate
+      };
+    case 'zemen-pdf':
+      return {
+        receiverName: receipt.recipientName,
+        receiverAccount: receipt.recipientAccount,
+        completed: isCompletedStatus(receipt.transactionStatus),
+      };
+    case 'boa-json':
+      return {
+        receiverName: receipt.receiverName,
+        receiverAccount: receipt.receiverAccount,
+        completed: isCompletedStatus(receipt.upstreamStatus),
+      };
+    case 'awash-html':
+      return {
+        receiverName: receipt.transaction?.beneficiaryName,
+        receiverAccount: receipt.transaction?.beneficiaryAccount,
+        completed: true,
+      };
+    default:
+      return { receiverName: '', receiverAccount: '', completed: false };
+  }
+}
+
+/** Currency for the sources whose amount field is confirmed (see extractAmount). */
+function extractCurrency(receipt) {
+  if (receipt?.currency) return String(receipt.currency).toUpperCase();
+  // telebirr/awash amounts are strings like "100 Birr" — parseLeadingNumber strips the unit,
+  // but everywhere links.et documents an amount without an explicit currency field, it's ETB.
+  if (['telebirr-html', 'awash-html'].includes(receipt?.source)) return 'ETB';
+  return null;
+}
+
 /**
  * Normalizes a links.et `verify()` success result into the shape the rest of the app
  * wants: { bank, amount, amountConfirmed, reference, source, providerKey }.
@@ -89,13 +145,21 @@ function isMeteredSource(source) {
 export function normalizeReceipt(result) {
   const receipt = result?.receipt || {};
   const amount = extractAmount(receipt);
+  const receiver = extractReceiver(receipt);
   return {
     bank: extractBankName(receipt, result?.providerKey),
     amount,
     amountConfirmed: amount !== undefined,
+    currency: extractCurrency(receipt),
     reference: receipt.receiptNo || receipt.reference || receipt.transactionReference || null,
     source: receipt.source || null,
     providerKey: result?.providerKey || null,
     metered: isMeteredSource(receipt.source),
+    receiverName: receiver.receiverName || '',
+    receiverAccount: receiver.receiverAccount || '',
+    // Whether we could confirm this receipt names a receiver at all — false for sources not
+    // covered by extractReceiver(), which should never be treated as "receiver verified".
+    receiverConfirmed: Boolean(BANK_NAMES_BY_SOURCE[receipt.source] && receiver.receiverAccount),
+    completed: receiver.completed,
   };
 }
