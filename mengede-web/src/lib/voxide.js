@@ -1,5 +1,6 @@
 import { VoxideClient } from '@voxide/react';
 import { MENTORS, rateLabel } from '../data/mentors.js';
+import { createBooking, getMentorTakenSlots } from './api.js';
 
 // Publishable key: safe to ship in the browser. Override per environment with
 // VITE_VOXIDE_PUBLIC_KEY (see .env.example).
@@ -14,9 +15,7 @@ export const ai = new VoxideClient({ publicKey: PUBLIC_KEY });
 export const host = {
   navigate: null,       // (path) => void
   getState: null,       // () => object the agent can see on every turn
-  getBookings: null,    // () => booking[]
-  updateProfile: null,  // (patch) => updated profile summary
-  addBooking: null,     // (booking) => void
+  addBooking: null,     // (booking) => void — call after the booking is already persisted
 };
 
 function notReady() {
@@ -49,16 +48,15 @@ function findMentor(name) {
 }
 
 // Voice can mishear, so a booking that is about to be made asks the student to confirm first.
-// Anything that can't be booked (unknown mentor, taken slot, paid session) skips the dialog:
-// the handler then explains the problem to the agent, which tells the student.
+// We can't check the slot is still open here without an extra round trip, so anything that
+// isn't obviously a free-mentor booking (unknown mentor, paid session) skips the dialog: the
+// handler itself explains the problem to the agent, which relays it to the student.
 ai.onConfirmation((action, args) => {
   if (action.name !== 'bookMentorSession') {
     return typeof window !== 'undefined' && window.confirm(`Confirm: ${action.description}`);
   }
   const mentor = findMentor(args?.mentorName);
-  const alreadyBooked = (host.getBookings?.() ?? []).some(b => b.mentor.name === mentor?.name && b.slot === args?.slot);
-  const bookable = mentor && mentor.rate === 0 && mentor.slots.includes(args?.slot) && !alreadyBooked;
-  if (!bookable) return true;
+  if (!mentor || mentor.rate > 0 || !mentor.slots.includes(args?.slot)) return true;
   return typeof window !== 'undefined' && window.confirm(`Book ${mentor.name} for ${args.slot}?`);
 });
 
@@ -87,24 +85,29 @@ ai.register({
 
   listMentors: {
     description:
-      'List the mentors students can book, optionally filtered by a topic such as robotics, entrepreneurship or study skills. Returns real mentor names, roles, prices and open time slots.',
+      'List the mentors students can book, optionally filtered by a topic such as robotics, entrepreneurship or study skills. Returns real mentor names, roles, prices and open time slots (already booked slots excluded).',
     params: {
       topic: { type: 'string', description: 'Optional topic or skill to filter by' },
     },
-    handler: ({ topic } = {}) => {
-      const booked = new Set((host.getBookings?.() ?? []).map(b => `${b.mentor.name}|${b.slot}`));
+    handler: async ({ topic } = {}) => {
       const q = String(topic || '').trim().toLowerCase();
       const matches = q
         ? MENTORS.filter(m => [m.role, m.bio, ...m.tags].join(' ').toLowerCase().includes(q))
         : MENTORS;
-      const list = (matches.length ? matches : MENTORS).map(m => ({
-        name: m.name,
-        role: m.role,
-        topics: m.tags,
-        price: rateLabel(m),
-        minutes: m.duration,
-        openSlots: m.slots.filter(s => !booked.has(`${m.name}|${s}`)),
-      }));
+      const shown = matches.length ? matches : MENTORS;
+      // Slot availability is shared across every student, so ask the server, not local state.
+      const takenLists = await Promise.all(shown.map(m => getMentorTakenSlots(m.id)));
+      const list = shown.map((m, i) => {
+        const taken = new Set(takenLists[i]?.ok ? takenLists[i].taken : []);
+        return {
+          name: m.name,
+          role: m.role,
+          topics: m.tags,
+          price: rateLabel(m),
+          minutes: m.duration,
+          openSlots: m.slots.filter(s => !taken.has(s)),
+        };
+      });
       return {
         mentors: list,
         note: q && !matches.length ? `No mentor is tagged "${topic}"; showing everyone.` : undefined,
@@ -120,7 +123,7 @@ ai.register({
       slot: { type: 'string', required: true, description: 'One of the mentor\'s open slots, copied exactly from listMentors' },
     },
     requireConfirmation: true,
-    handler: ({ mentorName, slot }) => {
+    handler: async ({ mentorName, slot }) => {
       if (!host.addBooking) return notReady();
       const mentor = findMentor(mentorName);
       if (!mentor) {
@@ -129,9 +132,6 @@ ai.register({
       if (!mentor.slots.includes(slot)) {
         return { status: 'error', message: `"${slot}" is not one of ${mentor.name}'s slots.`, openSlots: mentor.slots };
       }
-      if ((host.getBookings?.() ?? []).some(b => b.mentor.name === mentor.name && b.slot === slot)) {
-        return { status: 'error', message: 'That slot is already booked.' };
-      }
       if (mentor.rate > 0) {
         host.navigate?.('/mentors');
         return {
@@ -139,7 +139,13 @@ ai.register({
           message: `${mentor.name}'s session costs ${rateLabel(mentor)}. Tell the student to open Book a Session on the Mentors page, pick the time and pay; it cannot be booked by voice.`,
         };
       }
-      host.addBooking({ mentor, slot, paid: false });
+      // The server is the one that actually decides the slot is still free — a person could be
+      // booking it right now through the UI.
+      const res = await createBooking(mentor.id, slot);
+      if (!res.ok) {
+        return { status: 'error', message: res.error || 'That slot was just taken. Ask the student to pick another.' };
+      }
+      host.addBooking({ ...res.booking, mentor });
       return { status: 'booked', mentor: mentor.name, slot };
     },
   },
