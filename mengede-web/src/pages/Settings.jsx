@@ -24,9 +24,8 @@ export default function Settings() {
         <div className="flex items-center gap-2 font-bold mb-3"><Icon name="volume" className="text-blue-500" /> Assistant voice</div>
         <div className="grid grid-cols-2 gap-3 mb-4">
           {Object.entries(VOICES).map(([key, v]) => (
-            <button
+            <div
               key={key}
-              onClick={() => set('voice', key)}
               className={`voice-card glass ${settings.voice === key ? 'sel' : ''}`}
             >
               <div className="font-semibold">{v.name}</div>
@@ -38,7 +37,7 @@ export default function Settings() {
               >
                 <Icon name="volume" className="w-3.5 h-3.5" /> Preview
               </span>
-            </button>
+            </div>
           ))}
         </div>
         <div className="set-row">
