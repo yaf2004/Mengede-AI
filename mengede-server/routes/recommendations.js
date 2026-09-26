@@ -1,4 +1,5 @@
 import express from 'express';
+import { Recommendation } from '../models/intelligence.js';
 import { buildUserContext } from '../services/context.js';
 import { listUniversities, listPathways } from '../services/catalog.js';
 import { requireDeviceId } from '../lib/deviceId.js';
@@ -31,16 +32,25 @@ function profileTokens(context) {
 function scoreEntity(entity, tokens, fields) {
   const candidates = tokenize(
     fields
-      .flatMap(field => Array.isArray(entity[field]) ? entity[field] : [entity[field]])
+      .flatMap(field =>
+        Array.isArray(entity[field]) ? entity[field] : [entity[field]]
+      )
       .join(' ')
   );
 
   let score = 0;
+
   for (const token of candidates) {
     if (tokens.has(token)) score += 1;
   }
 
   return score;
+}
+
+function reasonFor(score) {
+  return score > 0
+    ? 'Matches signals currently associated with your profile.'
+    : 'Worth exploring alongside your current academic and personal signals.';
 }
 
 router.get('/', async (req, res) => {
@@ -65,24 +75,51 @@ router.get('/', async (req, res) => {
       .slice(0, 4);
 
     const rankedUniversities = universities
-      .map(university => ({
-        ...university,
-        matchScore: scoreEntity(
+      .map(university => {
+        const matchScore = scoreEntity(
           university,
           tokens,
           ['name', 'city', 'region', 'departments', 'tags']
-        ),
-        reason:
-          scoreEntity(
-            university,
-            tokens,
-            ['name', 'city', 'region', 'departments', 'tags']
-          ) > 0
-            ? 'Matches signals currently associated with your profile.'
-            : 'Worth exploring alongside your current academic and personal signals.',
-      }))
+        );
+
+        return {
+          ...university,
+          matchScore,
+          reason: reasonFor(matchScore),
+        };
+      })
       .sort((a, b) => b.matchScore - a.matchScore)
       .slice(0, 4);
+
+    await Recommendation.deleteMany({
+      user_id: req.deviceId,
+      status: 'active',
+    });
+
+    const recommendations = [
+      ...rankedPathways.map(pathway => ({
+        user_id: req.deviceId,
+        entity_type: 'pathway',
+        entity_id: pathway.slug,
+        reason: pathway.reason || reasonFor(pathway.matchScore),
+        confidence: Math.min(pathway.matchScore / 5, 1),
+        status: 'active',
+        source: 'profile-and-interactions',
+      })),
+      ...rankedUniversities.map(university => ({
+        user_id: req.deviceId,
+        entity_type: 'university',
+        entity_id: university.slug,
+        reason: university.reason,
+        confidence: Math.min(university.matchScore / 5, 1),
+        status: 'active',
+        source: 'profile-and-interactions',
+      })),
+    ];
+
+    if (recommendations.length) {
+      await Recommendation.insertMany(recommendations);
+    }
 
     res.json({
       ok: true,
