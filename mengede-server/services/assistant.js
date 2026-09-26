@@ -72,7 +72,7 @@ async function runGemini(prompt) {
   if (grounded.ok) {
     return {
       ...grounded,
-      grounded: true,
+      grounded: Array.isArray(grounded.sources) && grounded.sources.length > 0,
     };
   }
 
