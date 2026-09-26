@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
+  discoverResources,
   getPathway,
   getResources,
   getUniversities,
@@ -36,9 +37,20 @@ export default function PathwayExplorer() {
 
       setData(pathwayResult.pathway);
 
-      if (resourceResult.ok) {
-        setResources(resourceResult.resources);
+      let foundResources = resourceResult.ok ? resourceResult.resources : [];
+
+      if (!foundResources.length) {
+        const discovery = await discoverResources(
+          pathwayResult.pathway.name +
+            ' Ethiopia university students introduction course tutorial careers ' +
+            (pathwayResult.pathway.careers || []).slice(0, 3).join(' ')
+        );
+
+        if (cancelled) return;
+        if (discovery.ok) foundResources = discovery.resources;
       }
+
+      if (!cancelled) setResources(foundResources);
 
       if (universityResult.ok) {
         const allowed = new Set(pathwayResult.pathway.universitySlugs || []);
