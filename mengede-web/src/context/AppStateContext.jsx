@@ -17,6 +17,7 @@ function withMentor(booking) {
 function fromServerProfile(serverProfile, current) {
   return {
     ...current,
+    name: serverProfile.name || current.name,
     interests: Array.isArray(serverProfile.interests)
       ? serverProfile.interests.join(', ')
       : serverProfile.interests || current.interests,
