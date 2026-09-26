@@ -52,7 +52,10 @@ export default function Profile() {
           : current.skills,
       }));
       flash('Profile refreshed');
+      return;
     }
+
+    flash(result.error || 'Could not refresh your profile.');
   }
 
   return (
