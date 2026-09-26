@@ -6,12 +6,20 @@ const router = express.Router();
 // ---- Student profile -------------------------------------------------------
 
 router.get('/profile/:userId', async (req, res) => {
+  if (req.header('x-device-id') !== req.params.userId) {
+    return res.status(403).json({ ok: false, error: 'You can only access your own profile.' });
+  }
+
   const profile = await StudentProfile.findOne({ user_id: req.params.userId });
   if (!profile) return res.status(404).json({ ok: false, error: 'No profile for this user yet.' });
   res.json({ ok: true, profile });
 });
 
 router.put('/profile/:userId', async (req, res) => {
+  if (req.header('x-device-id') !== req.params.userId) {
+    return res.status(403).json({ ok: false, error: 'You can only update your own profile.' });
+  }
+
   const { stage, grade, subjects, interests, strengths, goal, language } = req.body || {};
   if (!stage) return res.status(400).json({ ok: false, error: '`stage` is required.' });
 
