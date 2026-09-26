@@ -15,6 +15,7 @@ export default function Profile() {
 
   async function save() {
     const result = await saveStudentProfile({
+      name: draft.name.trim(),
       stage: 'university-choice',
       grade: '',
       subjects: [],
@@ -41,6 +42,7 @@ export default function Profile() {
     if (result.ok && result.profile) {
       setProfile(current => ({
         ...current,
+        name: result.profile.name || current.name,
         interests: Array.isArray(result.profile.interests)
           ? result.profile.interests.join(', ')
           : current.interests,
