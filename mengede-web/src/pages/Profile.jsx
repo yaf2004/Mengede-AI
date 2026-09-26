@@ -1,22 +1,64 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '../lib/icons.jsx';
 import { useAppState } from '../context/AppStateContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { getStudentProfile, saveStudentProfile } from '../lib/api.js';
 
 export default function Profile() {
   const { profile, setProfile } = useAppState();
   const [draft, setDraft] = useState(profile);
   const flash = useToast();
 
-  function save() {
+  useEffect(() => {
+    setDraft(profile);
+  }, [profile]);
+
+  async function save() {
+    const result = await saveStudentProfile({
+      stage: 'university-choice',
+      grade: '',
+      subjects: [],
+      interests: draft.interests
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean),
+      strengths: draft.skills,
+      goal: draft.goals,
+      language: 'en',
+    });
+
+    if (!result.ok) {
+      flash(result.error || 'Could not save your profile.');
+      return;
+    }
+
     setProfile(draft);
     flash('Profile saved');
+  }
+
+  async function refresh() {
+    const result = await getStudentProfile();
+    if (result.ok && result.profile) {
+      setProfile(current => ({
+        ...current,
+        interests: Array.isArray(result.profile.interests)
+          ? result.profile.interests.join(', ')
+          : current.interests,
+        goals: result.profile.goal || current.goals,
+        skills: Array.isArray(result.profile.strengths)
+          ? result.profile.strengths
+          : current.skills,
+      }));
+      flash('Profile refreshed');
+    }
   }
 
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-extrabold mb-1">Profile</h1>
-      <p className="text-slate-500 mb-6">This is what Mengede AI uses to personalize your recommendations.</p>
+      <p className="text-slate-500 mb-6">
+        This is what Mengede AI uses to personalize your recommendations.
+      </p>
 
       <div className="card p-5 mb-6 flex items-center gap-4">
         <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-2xl font-bold shrink-0">
@@ -29,19 +71,48 @@ export default function Profile() {
             <span className="pill badge-xp2">1,250 XP</span>
           </div>
         </div>
-        <button className="border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          className="border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-1.5 shrink-0"
+        >
           <Icon name="camera" className="w-4 h-4" /> Choose File
         </button>
       </div>
 
       <div className="card p-5 mb-6 space-y-4">
-        <Field label="Name" value={draft.name} onChange={v => setDraft(d => ({ ...d, name: v }))} />
-        <Field label="Interests" value={draft.interests} onChange={v => setDraft(d => ({ ...d, interests: v }))} hint="Comma-separated — this drives your dashboard feed" />
-        <Field label="Goals" value={draft.goals} onChange={v => setDraft(d => ({ ...d, goals: v }))} textarea placeholder="What are you hoping to figure out or achieve?" />
+        <Field
+          label="Name"
+          value={draft.name}
+          onChange={value => setDraft(d => ({ ...d, name: value }))}
+        />
+        <Field
+          label="Interests"
+          value={draft.interests}
+          onChange={value => setDraft(d => ({ ...d, interests: value }))}
+          hint="Comma-separated — this drives your dashboard feed"
+        />
+        <Field
+          label="Goals"
+          value={draft.goals}
+          onChange={value => setDraft(d => ({ ...d, goals: value }))}
+          textarea
+          placeholder="What are you hoping to figure out or achieve?"
+        />
       </div>
 
-      <div className="flex justify-end">
-        <button onClick={save} className="btn-primary px-5 py-2.5 rounded-lg text-sm flex items-center gap-2">
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={refresh}
+          className="border border-slate-200 rounded-lg px-5 py-2.5 text-sm font-medium"
+        >
+          Refresh
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          className="btn-primary px-5 py-2.5 rounded-lg text-sm flex items-center gap-2"
+        >
           <Icon name="save" className="w-4 h-4" /> Save Profile
         </button>
       </div>
@@ -51,12 +122,13 @@ export default function Profile() {
 
 function Field({ label, value, onChange, hint, textarea, placeholder }) {
   const Comp = textarea ? 'textarea' : 'input';
+
   return (
     <div>
       <label className="block text-sm font-medium mb-1">{label}</label>
       <Comp
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={event => onChange(event.target.value)}
         placeholder={placeholder}
         rows={textarea ? 3 : undefined}
         className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-400"
