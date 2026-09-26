@@ -1,4 +1,61 @@
-import {StudentProfile,Conversation,Message} from '../models/index.js';
-import {getUserIntelligence} from './intelligence.js';
-import {listPathways,listUniversities} from './catalog.js';
-export async function buildUserContext(userId,conversationId){const profile=await StudentProfile.findOne({user_id:userId}).lean();const intelligence=await getUserIntelligence(userId);const messages=conversationId?await Message.find({conversation_id:conversationId}).sort({created_at:-1}).limit(12).lean():[];const [universities,pathways]=await Promise.all([listUniversities(),listPathways()]);return{profile:profile||{stage:'university-choice',interests:[],strengths:[],goal:''},intelligence:intelligence||{signals:[],explored_universities:[],explored_pathways:[]},recentMessages:messages.reverse().map(m=>({role:m.role,text:m.text})),availableUniversities:universities.map(u=>({slug:u.slug,name:u.name,city:u.city,type:u.type,departments:u.departments,tags:u.tags})),availablePathways:pathways.map(p=>({slug:p.slug,name:p.name,description:p.description,skills:p.skills,subjects:p.subjects,careers:p.careers,universitySlugs:p.universitySlugs}))};}
+import { StudentProfile, Message } from '../models/index.js';
+import { getUserIntelligence } from './intelligence.js';
+import { listPathways, listUniversities } from './catalog.js';
+
+export async function buildUserContext(userId, conversationId) {
+  const [profile, intelligence, messages, universities, pathways] =
+    await Promise.all([
+      StudentProfile.findOne({ user_id: userId }).lean(),
+      getUserIntelligence(userId),
+      conversationId
+        ? Message.find({ conversation_id: conversationId })
+            .sort({ created_at: -1 })
+            .limit(12)
+            .lean()
+        : [],
+      listUniversities(),
+      listPathways(),
+    ]);
+
+  return {
+    profile: profile || {
+      stage: 'university-choice',
+      interests: [],
+      strengths: [],
+      goal: '',
+    },
+    intelligence: intelligence || {
+      signals: [],
+      explored_universities: [],
+      explored_pathways: [],
+      saved_resources: [],
+      rejected_resources: [],
+      summary: '',
+    },
+    recentMessages: messages
+      .reverse()
+      .map(message => ({
+        role: message.role,
+        text: message.text,
+      })),
+    availableUniversities: universities.map(university => ({
+      slug: university.slug,
+      name: university.name,
+      city: university.city,
+      region: university.region,
+      type: university.type,
+      departments: university.departments,
+      tags: university.tags,
+    })),
+    availablePathways: pathways.map(pathway => ({
+      slug: pathway.slug,
+      name: pathway.name,
+      description: pathway.description,
+      fields: pathway.fields,
+      skills: pathway.skills,
+      subjects: pathway.subjects,
+      careers: pathway.careers,
+      universitySlugs: pathway.universitySlugs,
+    })),
+  };
+}
