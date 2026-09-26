@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { verify, isLinksEtConfigured } from '../lib/linksEt.js';
 import { normalizeReceipt } from '../lib/receiptParsing.js';
@@ -23,7 +24,7 @@ const ERROR_MESSAGES = {
 
 // A receipt reference/URL is effectively a credential for someone's bank transaction —
 // links.et's own docs say not to log it. We only ever store/log a normalized hash key.
-const hashKey = (ref) => ref.trim().toLowerCase();
+const hashKey = (ref) => crypto.createHash('sha256').update(ref.trim().toLowerCase()).digest('hex');
 const looksLikeUrl = (value) => /^https?:\/\//i.test(value);
 const fail = (res, status, error, extra = {}) => res.status(status).json({ ok: false, error, ...extra });
 

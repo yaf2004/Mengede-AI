@@ -1,59 +1,175 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Icon } from '../lib/icons.jsx';
 import { useAppState } from '../context/AppStateContext.jsx';
-import { FEED, FEED_COLORS, FEED_LABELS } from '../data/content.js';
+import { getRecommendations, getResources } from '../lib/api.js';
+import UniversityCard from '../components/UniversityCard.jsx';
+import PathwayCard from '../components/PathwayCard.jsx';
+import ResourceCard from '../components/ResourceCard.jsx';
 
 export default function Dashboard() {
   const { profile } = useAppState();
+  const [data, setData] = useState({ universities: [], pathways: [] });
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all([
+      getRecommendations(),
+      getResources({ type: 'video' }),
+    ])
+      .then(([recommendations, resourceResult]) => {
+        if (cancelled) return;
+
+        if (!recommendations.ok) {
+          setError(
+            recommendations.error ||
+              'Recommendations are unavailable right now.'
+          );
+        } else {
+          setData(recommendations);
+        }
+
+        if (resourceResult.ok) {
+          setResources(resourceResult.resources.slice(0, 3));
+        }
+
+        setLoading(false);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setError(error.message || 'Could not load your dashboard.');
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const firstName = (profile.name || 'Student').trim().split(/\s+/)[0];
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold mb-1">Welcome back, {profile.name.split(' ')[0]}</h1>
-      <p className="text-slate-500 mb-6">Here's what's relevant to your path today.</p>
+      <h1 className="text-2xl font-extrabold mb-1">
+        Welcome back, {firstName}
+      </h1>
+      <p className="text-slate-500 mb-6">
+        Let's turn university uncertainty into something you can actually explore.
+      </p>
 
-      {profile.completion < 100 && (
-        <div
-          className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 text-white"
-          style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}
-        >
-          <div>
-            <div className="font-bold mb-0.5">Your profile is {profile.completion}% complete</div>
-            <div className="text-sm text-blue-100">Finish it so recommendations get sharper.</div>
+      <div className="card p-5 mb-7">
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <Icon name="sparkles" />
           </div>
-          <Link to="/profile" className="glass glass-onblue font-semibold px-4 py-2 rounded-lg text-sm shrink-0">
-            Complete Now →
-          </Link>
+          <div>
+            <div className="font-bold">
+              Don't just get a recommendation. Experience the options.
+            </div>
+            <p className="text-sm text-slate-500 mt-1">
+              Mengede can connect your interests to pathways and universities,
+              then give you videos and resources to investigate them before you
+              commit.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="card p-4 mb-6 text-sm text-rose-600">
+          {error}
         </div>
       )}
 
-      <div className="flex gap-2 mb-8">
-        <span className="pill glass glass-amber"><Icon name="flame" className="w-3.5 h-3.5" /> 7 Day Streak</span>
-        <span className="pill glass glass-blue-text"><Icon name="zap" className="w-3.5 h-3.5" /> 1,250 XP</span>
-      </div>
-
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <h2 className="pill glass glass-blue-text font-bold" style={{ padding: '8px 20px', fontSize: 17, cursor: 'default' }}>
-          Recommended for you
-        </h2>
-        <span className="pill glass" style={{ padding: '4px 12px', fontSize: 12, cursor: 'default' }}>
-          Based on: {profile.interests}
-        </span>
-      </div>
-
-      <div className="space-y-3">
-        {FEED.map((item, i) => (
-          <div key={i} className="card p-4 flex gap-4">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${FEED_COLORS[item.color]}`}>
-              <Icon name={item.icon} />
+      {loading ? (
+        <div className="card p-6 text-sm text-slate-500">
+          Building your recommendations…
+        </div>
+      ) : (
+        <>
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold">Pathways worth exploring</h2>
+              <Link
+                to="/assistant"
+                className="text-sm text-blue-600 font-semibold"
+              >
+                Ask Mengede →
+              </Link>
             </div>
-            <div>
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{FEED_LABELS[item.type]}</div>
-              <div className="font-semibold mb-1">{item.title}</div>
-              <div className="text-sm text-slate-600">{item.body}</div>
+
+            {data.pathways.length ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                {data.pathways.map(pathway => (
+                  <PathwayCard
+                    key={pathway.slug}
+                    pathway={pathway}
+                    reason={
+                      pathway.matchScore
+                        ? 'Matches signals currently associated with your profile.'
+                        : 'Worth exploring before making a decision.'
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="card p-5 text-sm text-slate-500">
+                No pathways are available yet.
+              </div>
+            )}
+          </section>
+
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold">
+                Universities to investigate
+              </h2>
+              <Link
+                to="/assistant"
+                className="text-sm text-blue-600 font-semibold"
+              >
+                Ask why →
+              </Link>
             </div>
-          </div>
-        ))}
-      </div>
+
+            {data.universities.length ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                {data.universities.map(university => (
+                  <UniversityCard
+                    key={university.slug}
+                    university={university}
+                    reason={university.reason}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="card p-5 text-sm text-slate-500">
+                No university recommendations are available yet.
+              </div>
+            )}
+          </section>
+
+          {resources.length > 0 && (
+            <section>
+              <h2 className="text-lg font-bold mb-3">
+                Watch before you decide
+              </h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                {resources.map((resource, index) => (
+                  <ResourceCard
+                    key={resource.external_id || resource._id || index}
+                    resource={resource}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
