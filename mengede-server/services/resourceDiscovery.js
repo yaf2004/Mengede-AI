@@ -88,8 +88,10 @@ export async function discoverResources(query) {
   try {
     const data = JSON.parse(String(result.output_text || '{}'));
 
+    const groundedUrls = new Set((result.sources || []).map(source => source.url));
+
     return (data.resources || [])
-      .filter(resource => resource?.url)
+      .filter(resource => resource?.url && groundedUrls.has(resource.url))
       .map(resource => ({
         ...resource,
         type: RESOURCE_TYPES.has(resource.type)
