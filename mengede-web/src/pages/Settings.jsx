@@ -26,17 +26,27 @@ export default function Settings() {
           {Object.entries(VOICES).map(([key, v]) => (
             <div
               key={key}
+              role="button"
+              tabIndex={0}
+              onClick={() => set('voice', key)}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  set('voice', key);
+                }
+              }}
               className={`voice-card glass ${settings.voice === key ? 'sel' : ''}`}
             >
               <div className="font-semibold">{v.name}</div>
               <div className="text-xs text-slate-500">{v.gender} · {v.desc}</div>
-              <span
+              <button
+                type="button"
                 className="pill glass"
                 style={{ padding: '4px 12px', fontSize: 12 }}
                 onClick={(e) => { e.stopPropagation(); speak('Selam! I am Mengede AI. Ask me anything about your path.', key); }}
               >
                 <Icon name="volume" className="w-3.5 h-3.5" /> Preview
-              </span>
+              </button>
             </div>
           ))}
         </div>
