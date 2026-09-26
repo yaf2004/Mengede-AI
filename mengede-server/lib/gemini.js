@@ -1,39 +1,61 @@
 import 'dotenv/config';
 
-const URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+const URL =
+  'https://generativelanguage.googleapis.com/v1beta/interactions';
+const REQUEST_TIMEOUT_MS = 25_000;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const DEFAULT_SCHEMA = {
   type: 'object',
   properties: {
     content: {
-      type: 'string'
-    }
+      type: 'string',
+    },
   },
-  required: ['content']
+  required: ['content'],
 };
 
 function outputText(data) {
   return (
     data?.output_text ||
     data?.steps
-      ?.find((step) => step.type === 'model_output')
+      ?.find(step => step.type === 'model_output')
       ?.content
-      ?.find((content) => content.type === 'text')
+      ?.find(content => content.type === 'text')
       ?.text ||
     ''
   );
+}
+
+function extractSources(data) {
+  const sources = [];
+
+  for (const step of data.steps || []) {
+    for (const content of step.content || []) {
+      for (const annotation of content.annotations || []) {
+        if (annotation.type === 'url_citation' && annotation.url) {
+          sources.push({
+            title: annotation.title || annotation.url,
+            url: annotation.url,
+          });
+        }
+      }
+    }
+  }
+
+  return sources;
 }
 
 export async function interact({
   input,
   model,
   schema = DEFAULT_SCHEMA,
-  useSearch = false
+  useSearch = false,
 } = {}) {
   const key = process.env.GEMINI_API_KEY;
-  const used = model || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const used =
+    model || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
   if (!key) {
     return {
@@ -42,9 +64,9 @@ export async function interact({
       model: used,
       output_text: JSON.stringify({
         content:
-          'Gemini is not configured yet. Set GEMINI_API_KEY to enable the live assistant.'
+          'Gemini is not configured yet. Set GEMINI_API_KEY to enable the live assistant.',
       }),
-      sources: []
+      sources: [],
     };
   }
 
@@ -54,46 +76,43 @@ export async function interact({
     response_format: {
       type: 'text',
       mime_type: 'application/json',
-      schema
+      schema,
     },
-    store: false
+    store: false,
   };
 
   if (useSearch) {
-    body.tools = [
-      {
-        type: 'google_search'
-      }
-    ];
+    body.tools = [{ type: 'google_search' }];
   }
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT_MS
+    );
+
     try {
-      const res = await fetch(URL, {
+      const response = await fetch(URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': key,
-          'Api-Revision': '2026-05-20'
+          'Api-Revision': '2026-05-20',
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const sources = [];
+      if (response.ok) {
+        const data = await response.json();
 
-        for (const step of data.steps || []) {
-          for (const content of step.content || []) {
-            for (const annotation of content.annotations || []) {
-              if (annotation.type === 'url_citation') {
-                sources.push({
-                  title: annotation.title || annotation.url,
-                  url: annotation.url
-                });
-              }
-            }
-          }
+        if (data.status && data.status !== 'completed') {
+          return {
+            ok: false,
+            status: data.status,
+            error: 'Gemini interaction did not complete.',
+          };
         }
 
         return {
@@ -101,26 +120,24 @@ export async function interact({
           simulated: false,
           model: used,
           output_text: outputText(data),
-          sources
+          sources: extractSources(data),
         };
       }
 
-      if (res.status === 429) {
-        const errorText = await res.text();
-
+      if (response.status === 429) {
         return {
           ok: false,
           status: 429,
-          error: errorText,
-          quota_exceeded: true
+          error: await response.text(),
+          quota_exceeded: true,
         };
       }
 
-      if (res.status >= 500) {
-        const errorText = await res.text();
+      if (response.status >= 500) {
+        const errorText = await response.text();
 
         console.log(
-          `Gemini attempt ${attempt} failed: HTTP ${res.status}`
+          `Gemini attempt ${attempt} failed: HTTP ${response.status}`
         );
         console.log(errorText);
 
@@ -131,30 +148,35 @@ export async function interact({
 
         return {
           ok: false,
-          status: res.status,
-          error: errorText
+          status: response.status,
+          error: errorText,
         };
       }
 
       return {
         ok: false,
-        status: res.status,
-        error: await res.text()
+        status: response.status,
+        error: await response.text(),
       };
     } catch (error) {
       if (attempt === 3) {
         return {
           ok: false,
-          error: error.message
+          error:
+            error.name === 'AbortError'
+              ? 'Gemini request timed out.'
+              : error.message,
         };
       }
 
       await sleep(attempt * 1000);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
   return {
     ok: false,
-    error: 'Exceeded retry attempts'
+    error: 'Exceeded retry attempts',
   };
 }
