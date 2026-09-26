@@ -1,1 +1,45 @@
-export async function searchYouTube(query,{maxResults=6}={}){const key=process.env.YOUTUBE_API_KEY;if(!key||!query)return[];const u=new URL('https://www.googleapis.com/youtube/v3/search');u.searchParams.set('part','snippet');u.searchParams.set('q',query);u.searchParams.set('type','video');u.searchParams.set('maxResults',String(Math.min(maxResults,10)));u.searchParams.set('key',key);const r=await fetch(u);if(!r.ok)return[];const d=await r.json();return(d.items||[]).map(i=>({external_id:i.id.videoId,title:i.snippet.title,type:'video',provider:'YouTube',url:'https://www.youtube.com/watch?v='+i.id.videoId,embed_url:'https://www.youtube.com/embed/'+i.id.videoId,thumbnail_url:i.snippet.thumbnails?.high?.url||i.snippet.thumbnails?.medium?.url,author:i.snippet.channelTitle,description:i.snippet.description,published_at:i.snippet.publishedAt,source_kind:'youtube-search'}));}
+const TIMEOUT_MS = 8000;
+
+export async function searchYouTube(query, { maxResults = 6 } = {}) {
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key || !query?.trim()) return [];
+
+  const url = new URL('https://www.googleapis.com/youtube/v3/search');
+  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('q', query.trim());
+  url.searchParams.set('type', 'video');
+  url.searchParams.set('maxResults', String(Math.min(Math.max(maxResults, 1), 10)));
+  url.searchParams.set('key', key);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return [];
+
+    const data = await response.json();
+
+    return (data.items || [])
+      .filter(item => item?.id?.videoId)
+      .map(item => ({
+        external_id: item.id.videoId,
+        title: item.snippet.title,
+        type: 'video',
+        provider: 'YouTube',
+        url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+        embed_url: `https://www.youtube.com/embed/${item.id.videoId}`,
+        thumbnail_url:
+          item.snippet.thumbnails?.high?.url ||
+          item.snippet.thumbnails?.medium?.url,
+        author: item.snippet.channelTitle,
+        description: item.snippet.description,
+        published_at: item.snippet.publishedAt,
+        source_kind: 'youtube-search',
+      }));
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
