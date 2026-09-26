@@ -1,6 +1,24 @@
 import { getDeviceId } from './device.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const CONVERSATION_KEY = 'mengede-conversation-id';
+
+function getConversationId() {
+  try {
+    return localStorage.getItem(CONVERSATION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setConversationId(id) {
+  if (!id) return;
+  try {
+    localStorage.setItem(CONVERSATION_KEY, id);
+  } catch {
+    // Ignore storage failures; the current in-memory request still works.
+  }
+}
 
 async function call(path, { method = 'GET', body } = {}) {
   try {
@@ -51,38 +69,48 @@ export const listBookings = () => call('/api/bookings');
 export const clearBookings = () =>
   call('/api/bookings', { method: 'DELETE' });
 
-export const getMentorPayment = (id) =>
+export const getMentorPayment = id =>
   call('/api/mentors/' + encodeURIComponent(id) + '/payment');
 
-export const getMentorTakenSlots = (id) =>
+export const getMentorTakenSlots = id =>
   call('/api/mentors/' + encodeURIComponent(id) + '/slots');
 
-export const askMengede = (text, conversationId) =>
-  call('/api/assistant', {
+export const askMengede = async (text, conversationId) => {
+  const id = conversationId || getConversationId();
+  const result = await call('/api/assistant', {
     method: 'POST',
-    body: { text, conversationId }
+    body: { text, conversationId: id }
   });
+
+  if (result.ok && result.conversationId) {
+    setConversationId(result.conversationId);
+  }
+
+  return result;
+};
 
 export const getRecommendations = () => call('/api/recommendations');
 
 export const getUniversities = () => call('/api/universities');
 
-export const getUniversity = (slug) =>
+export const getUniversity = slug =>
   call('/api/universities/' + encodeURIComponent(slug));
 
 export const getPathways = () => call('/api/pathways');
 
-export const getPathway = (slug) =>
+export const getPathway = slug =>
   call('/api/pathways/' + encodeURIComponent(slug));
 
 export const getResources = (params = {}) => {
   const query = new URLSearchParams(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    Object.entries(params).filter(
+      ([, value]) => value !== undefined && value !== null && value !== ''
+    )
   );
   return call('/api/resources' + (query.toString() ? '?' + query : ''));
 };
 
-export const discoverResources = (query) =>
+export const discoverResources = query =>
   call('/api/resources/discover?q=' + encodeURIComponent(query));
 
 export const recordInteraction = (
@@ -102,7 +130,7 @@ export const getUserIntelligence = () =>
 export const getStudentProfile = () =>
   call('/api/data/profile/' + encodeURIComponent(getDeviceId()));
 
-export const saveStudentProfile = (profile) =>
+export const saveStudentProfile = profile =>
   call('/api/data/profile/' + encodeURIComponent(getDeviceId()), {
     method: 'PUT',
     body: profile
