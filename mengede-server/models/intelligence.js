@@ -1,0 +1,17 @@
+import mongoose from '../lib/mongo.js';
+const { Schema, model, models } = mongoose;
+const UniversitySchema=new Schema({slug:{type:String,required:true,unique:true,index:true},name:{type:String,required:true},city:String,region:String,type:String,description:String,website:String,departments:[String],tags:[String],officialSources:[String]},{timestamps:true});
+const PathwaySchema=new Schema({slug:{type:String,required:true,unique:true,index:true},name:{type:String,required:true},description:String,fields:[String],skills:[String],subjects:[String],careers:[String],universitySlugs:[String],stages:[{title:String,description:String,resourceIds:[String]}]},{timestamps:true});
+const ResourceSchema=new Schema({external_id:{type:String,index:true},title:{type:String,required:true},type:{type:String,enum:['video','course','article','paper','document','website','project','discussion'],required:true},provider:String,url:String,embed_url:String,thumbnail_url:String,author:String,description:String,university_slug:String,pathway_slug:String,topics:[String],source_kind:String,published_at:Date,searchable:{type:Boolean,default:true}},{timestamps:true});
+ResourceSchema.index({university_slug:1,type:1}); ResourceSchema.index({pathway_slug:1,type:1});
+const InteractionEventSchema=new Schema({user_id:{type:String,required:true,index:true},type:{type:String,required:true,index:true},entity_type:String,entity_id:String,metadata:Schema.Types.Mixed},{timestamps:{createdAt:'created_at',updatedAt:false}});
+InteractionEventSchema.index({user_id:1,created_at:-1});
+const UserIntelligenceSchema=new Schema({user_id:{type:String,required:true,unique:true,index:true},signals:[{key:String,value:Schema.Types.Mixed,strength:{type:Number,default:.5},evidence:[{type:String,source:String,created_at:Date}]}],explored_universities:[String],explored_pathways:[String],saved_resources:[String],rejected_resources:[String],summary:String},{timestamps:true});
+const RecommendationSchema=new Schema({user_id:{type:String,required:true,index:true},entity_type:{type:String,required:true},entity_id:{type:String,required:true},reason:String,confidence:Number,status:{type:String,default:'active'},source:String},{timestamps:true});
+RecommendationSchema.index({user_id:1,status:1});
+export const University=models.University||model('University',UniversitySchema);
+export const Pathway=models.Pathway||model('Pathway',PathwaySchema);
+export const Resource=models.Resource||model('Resource',ResourceSchema);
+export const InteractionEvent=models.InteractionEvent||model('InteractionEvent',InteractionEventSchema);
+export const UserIntelligence=models.UserIntelligence||model('UserIntelligence',UserIntelligenceSchema);
+export const Recommendation=models.Recommendation||model('Recommendation',RecommendationSchema);
