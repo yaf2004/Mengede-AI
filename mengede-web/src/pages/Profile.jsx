@@ -54,7 +54,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="profile-page max-w-2xl">
       <h1 className="text-2xl font-extrabold mb-1">Profile</h1>
       <p className="text-slate-500 mb-6">
         This is what Mengede AI uses to personalize your recommendations.
@@ -73,7 +73,7 @@ export default function Profile() {
         </div>
         <button
           type="button"
-          className="border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-1.5 shrink-0"
+          className="profile-secondary-button border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-1.5 shrink-0"
         >
           <Icon name="camera" className="w-4 h-4" /> Choose File
         </button>
@@ -104,7 +104,7 @@ export default function Profile() {
         <button
           type="button"
           onClick={refresh}
-          className="border border-slate-200 rounded-lg px-5 py-2.5 text-sm font-medium"
+          className="profile-secondary-button border border-slate-200 rounded-lg px-5 py-2.5 text-sm font-medium"
         >
           Refresh
         </button>
@@ -131,7 +131,7 @@ function Field({ label, value, onChange, hint, textarea, placeholder }) {
         onChange={event => onChange(event.target.value)}
         placeholder={placeholder}
         rows={textarea ? 3 : undefined}
-        className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-400"
+        className="profile-field w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-400"
       />
       {hint && <div className="text-xs text-slate-400 mt-1">{hint}</div>}
     </div>
