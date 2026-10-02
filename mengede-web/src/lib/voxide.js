@@ -42,6 +42,50 @@ ai.enableNavigation(
 
 ai.bindState(() => host.getState?.() ?? {});
 
+function splitList(value) {
+  return String(value || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
+function findMentor(name) {
+  const q = String(name || '').trim().toLowerCase();
+
+  if (!q) return null;
+
+  return (
+    MENTORS.find(mentor => mentor.name.toLowerCase() === q) ||
+    MENTORS.find(
+      mentor =>
+        mentor.name.toLowerCase().includes(q) ||
+        q.includes(mentor.name.split(' ')[0].toLowerCase())
+    ) ||
+    null
+  );
+}
+
+// Voice can mishear, so free mentor bookings require confirmation.
+ai.onConfirmation((action, args) => {
+  if (action.name !== 'bookMentorSession') {
+    return (
+      typeof window !== 'undefined' &&
+      window.confirm(`Confirm: ${action.description}`)
+    );
+  }
+
+  const mentor = findMentor(args?.mentorName);
+
+  if (!mentor || mentor.rate > 0 || !mentor.slots.includes(args?.slot)) {
+    return true;
+  }
+
+  return (
+    typeof window !== 'undefined' &&
+    window.confirm(`Book ${mentor.name} for ${args.slot}?`)
+  );
+});
+
 ai.register({
   askMengede: {
     description:
@@ -55,117 +99,191 @@ ai.register({
     },
     handler: async ({ text }) => {
       const result = await askMengede(text);
+
       return result.ok
         ? result
         : {
             status: 'error',
-            message: result.error || 'Mengede could not answer right now.',
+            message:
+              result.error || 'Mengede could not answer right now.',
           };
     },
   },
 
   updateProfile: {
     description:
-      'Save information the student explicitly shares about interests, goals or skills.',
+      'Save what the student has told you about their interests, goals or skills to their profile. Call it when they share something worth remembering, not for every message.',
     params: {
-      interests: { type: 'string' },
-      goals: { type: 'string', sensitive: true },
-      skills: { type: 'string' },
+      interests: {
+        type: 'string',
+        description:
+          'Comma-separated interests to add, e.g. "AI, robotics"',
+      },
+      goals: {
+        type: 'string',
+        description: 'What the student wants to achieve, in their own words',
+        sensitive: true,
+      },
+      skills: {
+        type: 'string',
+        description:
+          'Comma-separated skills to add, e.g. "Python basics, public speaking"',
+      },
     },
-    handler: async args => {
+    handler: args => {
       if (!host.updateProfile) return notReady();
 
-      return host.updateProfile({
-        interests: String(args?.interests || '')
-          .split(',')
-          .map(value => value.trim())
-          .filter(Boolean),
-        skills: String(args?.skills || '')
-          .split(',')
-          .map(value => value.trim())
-          .filter(Boolean),
-        goals: String(args?.goals || '').trim(),
-      });
+      const patch = {
+        interests: splitList(args?.interests),
+        skills: splitList(args?.skills),
+        goals:
+          typeof args?.goals === 'string'
+            ? args.goals.trim()
+            : '',
+      };
+
+      if (
+        !patch.interests.length &&
+        !patch.skills.length &&
+        !patch.goals
+      ) {
+        return {
+          status: 'error',
+          message:
+            'Nothing to save. Ask the student what they want to add.',
+        };
+      }
+
+      return {
+        status: 'ok',
+        profile: host.updateProfile(patch),
+      };
     },
   },
 
   listMentors: {
-    description: 'List mentors students can book.',
+    description:
+      'List the mentors students can book, optionally filtered by a topic such as robotics, entrepreneurship or study skills. Returns real mentor names, roles, prices and open time slots with already booked slots excluded.',
     params: {
-      topic: { type: 'string' },
+      topic: {
+        type: 'string',
+        description: 'Optional topic or skill to filter by',
+      },
     },
     handler: async ({ topic } = {}) => {
-      const query = String(topic || '').toLowerCase();
-      const mentors = query
+      const q = String(topic || '').trim().toLowerCase();
+
+      const matches = q
         ? MENTORS.filter(mentor =>
             [mentor.role, mentor.bio, ...mentor.tags]
               .join(' ')
               .toLowerCase()
-              .includes(query)
+              .includes(q)
           )
         : MENTORS;
 
-      const shown = mentors.length ? mentors : MENTORS;
-      const taken = await Promise.all(
+      const shown = matches.length ? matches : MENTORS;
+
+      const takenLists = await Promise.all(
         shown.map(mentor => getMentorTakenSlots(mentor.id))
       );
 
-      return {
-        mentors: shown.map((mentor, index) => ({
+      const list = shown.map((mentor, index) => {
+        const taken = new Set(
+          takenLists[index]?.ok
+            ? takenLists[index].taken
+            : []
+        );
+
+        return {
           name: mentor.name,
           role: mentor.role,
           topics: mentor.tags,
           price: rateLabel(mentor),
+          minutes: mentor.duration,
           openSlots: mentor.slots.filter(
-            slot => !(taken[index]?.taken || []).includes(slot)
+            slot => !taken.has(slot)
           ),
-        })),
+        };
+      });
+
+      return {
+        mentors: list,
+        note:
+          q && !matches.length
+            ? `No mentor is tagged "${topic}"; showing everyone.`
+            : undefined,
       };
     },
   },
 
   bookMentorSession: {
     description:
-      'Book a free mentor slot or navigate to payment for paid sessions.',
+      'Book a session with a mentor at one of their open time slots. Free sessions are booked immediately. Paid sessions are not booked here: the student is taken to the Mentors page to pay and submit a receipt.',
     params: {
-      mentorName: { type: 'string', required: true },
-      slot: { type: 'string', required: true },
+      mentorName: {
+        type: 'string',
+        required: true,
+        description:
+          'Mentor name as returned by listMentors',
+      },
+      slot: {
+        type: 'string',
+        required: true,
+        description:
+          'One of the mentor open slots, copied exactly from listMentors',
+      },
     },
     requireConfirmation: true,
+
     handler: async ({ mentorName, slot }) => {
-      const mentor = MENTORS.find(
-        item =>
-          item.name.toLowerCase() === String(mentorName).toLowerCase() ||
-          item.name
-            .toLowerCase()
-            .includes(String(mentorName).toLowerCase())
-      );
+      if (!host.addBooking) return notReady();
+
+      const mentor = findMentor(mentorName);
 
       if (!mentor) {
         return {
           status: 'error',
-          message: 'Mentor not found.',
+          message: `No mentor called "${mentorName}".`,
+          mentors: MENTORS.map(m => m.name),
+        };
+      }
+
+      if (!mentor.slots.includes(slot)) {
+        return {
+          status: 'error',
+          message: `"${slot}" is not one of ${mentor.name}'s slots.`,
+          openSlots: mentor.slots,
         };
       }
 
       if (mentor.rate > 0) {
         host.navigate?.('/mentors');
+
         return {
           status: 'payment_required',
-          message: 'Open Mentors to complete payment.',
+          message: `${mentor.name}'s session costs ${rateLabel(
+            mentor
+          )}. Tell the student to open Book a Session on the Mentors page, pick the time and pay; it cannot be booked by voice.`,
         };
       }
 
+      // The server is authoritative for slot availability.
       const result = await createBooking(mentor.id, slot);
 
       if (!result.ok) {
         return {
           status: 'error',
-          message: result.error || 'That slot is no longer available.',
+          message:
+            result.error ||
+            'That slot was just taken. Ask the student to pick another.',
         };
       }
 
-      host.addBooking?.({ ...result.booking, mentor });
+      host.addBooking({
+        ...result.booking,
+        mentor,
+      });
 
       return {
         status: 'booked',
@@ -180,19 +298,20 @@ let initState = {
   status: 'idle',
   error: null,
 };
+
 let initPromise = null;
-const listeners = new Set();
+const initListeners = new Set();
 
 function setInitState(next) {
   initState = next;
-  listeners.forEach(listener => listener());
+  initListeners.forEach(listener => listener());
 }
 
 export const getInitState = () => initState;
 
 export const subscribeInit = listener => {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  initListeners.add(listener);
+  return () => initListeners.delete(listener);
 };
 
 export function initVoxide() {
@@ -205,11 +324,19 @@ export function initVoxide() {
 
   initPromise = ai
     .init()
-    .then(() => setInitState({ status: 'ready', error: null }))
+    .then(() => {
+      setInitState({
+        status: 'ready',
+        error: null,
+      });
+    })
     .catch(error => {
       initPromise = null;
-      setInitState({ status: 'error', error });
-      return undefined;
+
+      setInitState({
+        status: 'error',
+        error,
+      });
     });
 
   return initPromise;
