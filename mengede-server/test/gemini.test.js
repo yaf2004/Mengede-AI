@@ -1,4 +1,4 @@
-import test, { afterEach } from 'node:test';
+import test, { afterEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 const originalFetch = globalThis.fetch;
@@ -14,95 +14,121 @@ afterEach(() => {
   }
 });
 
-test('interact returns a simulated response when Gemini is not configured', async () => {
-  delete process.env.GEMINI_API_KEY;
+describe('Gemini interactions', { concurrency: false }, () => {
+  test(
+    'interact returns a simulated response when Gemini is not configured',
+    async () => {
+      process.env.GEMINI_API_KEY = '';
+      const { interact } = await import(
+        '../lib/gemini.js?test=simulated'
+      );
 
-  const { interact } = await import('../lib/gemini.js?test=simulated');
+      const result = await interact({
+        input: 'hello',
+      });
 
-  const result = await interact({
-    input: 'hello',
-  });
+      assert.equal(result.ok, true);
+      assert.equal(result.simulated, true);
+      assert.match(
+        result.output_text,
+        /Gemini is not configured yet/
+      );
+    }
+  );
 
-  assert.equal(result.ok, true);
-  assert.equal(result.simulated, true);
-  assert.match(result.output_text, /Gemini is not configured yet/);
-});
+  test(
+    'interact parses structured JSON and URL citations',
+    async () => {
+      process.env.GEMINI_API_KEY = 'test-key';
 
-test('interact parses structured JSON and URL citations', async () => {
-  process.env.GEMINI_API_KEY = 'test-key';
-
-  globalThis.fetch = async () =>
-    new Response(
-      JSON.stringify({
-        status: 'completed',
-        output_text: '{"content":"hello"}',
-        steps: [
-          {
-            type: 'model_output',
-            content: [
+      globalThis.fetch = async () =>
+        new Response(
+          JSON.stringify({
+            status: 'completed',
+            output_text: '{"content":"hello"}',
+            steps: [
               {
-                type: 'text',
-                text: '{"content":"hello"}',
-                annotations: [
+                type: 'model_output',
+                content: [
                   {
-                    type: 'url_citation',
-                    title: 'Example',
-                    url: 'https://example.com',
+                    type: 'text',
+                    text: '{"content":"hello"}',
+                    annotations: [
+                      {
+                        type: 'url_citation',
+                        title: 'Example',
+                        url: 'https://example.com',
+                      },
+                    ],
                   },
                 ],
               },
             ],
-          },
-        ],
-      }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }
-    );
+          }),
+          {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+            },
+          }
+        );
 
-  const { interact } = await import('../lib/gemini.js?test=success');
+      const { interact } = await import(
+        '../lib/gemini.js?test=success'
+      );
 
-  const result = await interact({
-    input: 'hello',
-    useSearch: true,
-  });
+      const result = await interact({
+        input: 'hello',
+        useSearch: true,
+      });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.simulated, false);
-  assert.equal(result.output_text, '{"content":"hello"}');
-  assert.deepEqual(result.sources, [
-    {
-      title: 'Example',
-      url: 'https://example.com',
-    },
-  ]);
-});
-
-test('interact exposes quota exhaustion for assistant fallback', async () => {
-  process.env.GEMINI_API_KEY = 'test-key';
-
-  globalThis.fetch = async () =>
-    new Response(
-      JSON.stringify({
-        error: {
-          message: 'quota exceeded',
+      assert.equal(result.ok, true);
+      assert.equal(result.simulated, false);
+      assert.equal(
+        result.output_text,
+        '{"content":"hello"}'
+      );
+      assert.deepEqual(result.sources, [
+        {
+          title: 'Example',
+          url: 'https://example.com',
         },
-      }),
-      {
-        status: 429,
-        headers: { 'content-type': 'application/json' },
-      }
-    );
+      ]);
+    }
+  );
 
-  const { interact } = await import('../lib/gemini.js?test=quota');
+  test(
+    'interact exposes quota exhaustion for assistant fallback',
+    async () => {
+      process.env.GEMINI_API_KEY = 'test-key';
 
-  const result = await interact({
-    input: 'hello',
-    useSearch: true,
-  });
+      globalThis.fetch = async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              message: 'quota exceeded',
+            },
+          }),
+          {
+            status: 429,
+            headers: {
+              'content-type': 'application/json',
+            },
+          }
+        );
 
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 429);
-  assert.equal(result.quota_exceeded, true);
+      const { interact } = await import(
+        '../lib/gemini.js?test=quota'
+      );
+
+      const result = await interact({
+        input: 'hello',
+        useSearch: true,
+      });
+
+      assert.equal(result.ok, false);
+      assert.equal(result.status, 429);
+      assert.equal(result.quota_exceeded, true);
+    }
+  );
 });

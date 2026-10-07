@@ -4,6 +4,14 @@
 
 ### User Intelligence
 
+### University and Program Intelligence
+
+- feat: added a `UniversityProgram` knowledge layer linking universities to specific undergraduate pathways/programs instead of inferring offerings from department names.
+- feat: added program-level API endpoints under `/api/programs` and included undergraduate programs in university responses.
+- feat: added a deterministic reasoning fallback so Mengede can still produce structured university/pathway guidance when Gemini Search is unavailable.
+- fix: Gemini Search now enters a short cooldown after a `429` so repeated requests can fall back cleanly instead of repeatedly hitting the unavailable search path.
+
+
 - feat: added persistent interaction signals for resources, pathways, and universities.
 
 - feat: repeated interactions now strengthen existing signals instead of creating disconnected duplicate signals.

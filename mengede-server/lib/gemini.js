@@ -6,6 +6,8 @@ const REQUEST_TIMEOUT_MS = 25_000;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+const SEARCH_COOLDOWN_MS = 60 * 1000;
+let searchUnavailableUntil = 0;
 const DEFAULT_SCHEMA = {
   type: 'object',
   properties: {
@@ -53,6 +55,9 @@ export async function interact({
   schema = DEFAULT_SCHEMA,
   useSearch = false,
 } = {}) {
+  if (useSearch && Date.now() < searchUnavailableUntil) {
+    useSearch = false;
+  }
   const key = process.env.GEMINI_API_KEY;
   const used =
     model || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
@@ -125,6 +130,9 @@ export async function interact({
       }
 
       if (response.status === 429) {
+        if (useSearch) {
+          searchUnavailableUntil = Date.now() + SEARCH_COOLDOWN_MS;
+        }
         return {
           ok: false,
           status: 429,

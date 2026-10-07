@@ -1,16 +1,13 @@
 import { VoxideClient } from '@voxide/react';
 import { MENTORS, rateLabel } from '../data/mentors.js';
-import {
-  createBooking,
-  getMentorTakenSlots,
-  askMengede,
-} from './api.js';
+import { createBooking, getMentorTakenSlots, askMengede } from './api.js';
 
 const PUBLIC_KEY =
   import.meta.env.VITE_VOXIDE_PUBLIC_KEY ||
   'vox_pub_5e6352c01a162b52728cddc8344a70f71bc9643f07a8bed8';
 
-export const ai = new VoxideClient({ publicKey: PUBLIC_KEY });
+// One client for the whole app. The voice session lives inside it, so it survives page changes.
+export const ai = new VoxideClient({ publicKey: PUBLIC_KEY }); window.__mengedeAi = ai;
 
 export const host = {
   navigate: null,
@@ -217,6 +214,19 @@ ai.register({
     },
   },
 
+  askMengede: {
+    description: 'For university, career, pathway, study, or personal guidance questions, send the student message to Mengede. This action connects the voice interface to Mengede\'s personalized reasoning system. Use the returned response as the answer instead of answering these questions from your own knowledge.',
+    params: {
+      message: { type: 'string', required: true, description: 'The student\'s complete message or question' },
+    },
+    handler: async ({ message }) => {
+      const result = await askMengede(message, voiceConversationId);
+      if (result?.ok && result.conversationId) voiceConversationId = result.conversationId;
+      if (!result?.ok) return { status: 'error', message: result?.error || 'Mengede could not process that request.' };
+      return { status: 'ok', message: result.message, recommendations: result.recommendations || [], sources: result.sources || [] };
+    },
+  },
+
   bookMentorSession: {
     description:
       'Book a session with a mentor at one of their open time slots. Free sessions are booked immediately. Paid sessions are not booked here: the student is taken to the Mentors page to pay and submit a receipt.',
@@ -294,11 +304,13 @@ ai.register({
   },
 });
 
+// --- Init state, so the UI can show loading / error and retry -----------------------------
+let voiceConversationId = null;
+
 let initState = {
   status: 'idle',
   error: null,
 };
-
 let initPromise = null;
 const initListeners = new Set();
 
