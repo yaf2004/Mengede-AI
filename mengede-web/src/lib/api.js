@@ -98,6 +98,13 @@ export const getUniversity = slug =>
 
 export const getPathways = () => call('/api/pathways');
 
+export const getPrograms = (params = {}) => {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
+  return call('/api/programs' + (query.toString() ? '?' + query : ''));
+};
+
 export const getPathway = slug =>
   call('/api/pathways/' + encodeURIComponent(slug));
 
