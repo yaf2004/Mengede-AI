@@ -17,6 +17,36 @@ import {
 
 let seeded = false;
 
+const UNIVERSITY_ALIASES = {
+  'aau': 'addis-ababa-university',
+  'addis ababa university': 'addis-ababa-university',
+  'addis ababa uni': 'addis-ababa-university',
+  'aastu': 'addis-ababa-science-and-technology-university',
+  'addis ababa science and technology university': 'addis-ababa-science-and-technology-university',
+  'bahir dar university': 'bahir-dar-university',
+  'bahir dar uni': 'bahir-dar-university',
+  'bdu': 'bahir-dar-university',
+  'jimma university': 'jimma-university',
+  'jimma uni': 'jimma-university',
+  'ju': 'jimma-university',
+  'hawassa university': 'hawassa-university',
+  'hawassa uni': 'hawassa-university',
+  'hu': 'hawassa-university'
+};
+
+function normalizeLookup(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/\\s+/g, ' ');
+}
+
+function resolveUniversitySlug(value) {
+  const normalized = normalizeLookup(value);
+  return UNIVERSITY_ALIASES[normalized] || normalized;
+}
+
 export async function ensureCatalog() {
   if (seeded) return;
 
@@ -70,7 +100,14 @@ export async function listUniversities() {
 export async function getUniversity(slug) {
   await ensureCatalog();
 
-  return University.findOne({ slug }).lean();
+  const resolved = resolveUniversitySlug(slug);
+  return University.findOne({
+    $or: [
+      { slug: resolved },
+      { aliases: resolved },
+      { aliases: normalizeLookup(slug) }
+    ]
+  }).lean();
 }
 
 export async function listPathways() {
@@ -97,7 +134,7 @@ export async function listUniversityPrograms({
   const query = {};
 
   if (universitySlug) {
-    query.university_slug = universitySlug;
+    query.university_slug = resolveUniversitySlug(universitySlug);
   }
 
   if (pathwaySlug) {
@@ -120,7 +157,7 @@ export async function getUniversityProgram(
   await ensureCatalog();
 
   return UniversityProgram.findOne({
-    university_slug: universitySlug,
+    university_slug: resolveUniversitySlug(universitySlug),
     pathway_slug: pathwaySlug
   }).lean();
 }
