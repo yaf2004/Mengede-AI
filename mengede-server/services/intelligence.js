@@ -11,7 +11,9 @@ const SIGNAL_STRENGTH = {
   UNIVERSITY_SAVED: 0.7,
   UNIVERSITY_EXPLORED: 0.25,
   PATHWAY_EXPLORED: 0.25,
-  RESOURCE_OPENED: 0.15
+  RESOURCE_OPENED: 0.15,
+  ROADMAP_CREATED: 0.35,
+  ROADMAP_TASK_COMPLETED: 0.6
 };
 
 const SIGNAL_PREFIX = {
@@ -22,7 +24,9 @@ const SIGNAL_PREFIX = {
   UNIVERSITY_SAVED: 'university_interest:',
   UNIVERSITY_EXPLORED: 'university_explore:',
   PATHWAY_EXPLORED: 'pathway_explore:',
-  RESOURCE_OPENED: 'resource_open:'
+  RESOURCE_OPENED: 'resource_open:',
+  ROADMAP_CREATED: 'roadmap_created:',
+  ROADMAP_TASK_COMPLETED: 'roadmap_progress:'
 };
 
 function clamp(value, min = 0, max = 1) {
