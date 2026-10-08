@@ -6,7 +6,12 @@ import {
   getResources,
   getUniversities,
   getPrograms,
-  recordInteraction
+  recordInteraction,
+  getStudyPlans,
+  createStudyPlan,
+  getStudyPlanTasks,
+  createStudyTask,
+  updateStudyTask
 } from '../lib/api.js';
 import ResourceCard from '../components/ResourceCard.jsx';
 import UniversityCard from '../components/UniversityCard.jsx';
@@ -16,6 +21,9 @@ export default function PathwayExplorer() {
   const [data, setData] = useState(null);
   const [resources, setResources] = useState([]);
   const [universities, setUniversities] = useState([]);
+  const [roadmap, setRoadmap] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [roadmapBusy, setRoadmapBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -53,6 +61,16 @@ export default function PathwayExplorer() {
       }
 
       if (!cancelled) setResources(foundResources);
+
+      const plansResult = await getStudyPlans();
+      if (!cancelled && plansResult.ok && plansResult.plans?.length) {
+        const matching = plansResult.plans.find(plan => String(plan.title || '').toLowerCase().includes(String(pathwayResult.pathway.name || '').toLowerCase()));
+        if (matching) {
+          setRoadmap(matching);
+          const taskResult = await getStudyPlanTasks(matching._id);
+          if (!cancelled && taskResult.ok) setTasks(taskResult.tasks || []);
+        }
+      }
 
       if (universityResult.ok && programResult.ok) {
         const allowed = new Set(
@@ -120,6 +138,71 @@ export default function PathwayExplorer() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+
+      <section className="mt-8">
+        <div className="card p-5">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-lg font-bold">Your exploration roadmap</h2>
+              <p className="text-sm text-slate-500 mt-1">Turn this pathway into small actions instead of making one big decision.</p>
+            </div>
+            {!roadmap && (
+              <button
+                type="button"
+                className="btn-primary px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                disabled={roadmapBusy}
+                onClick={async () => {
+                  setRoadmapBusy(true);
+                  const created = await createStudyPlan({
+                    title: data.name + ' exploration roadmap',
+                    weeks: data.stages?.length || 1,
+                    startDate: new Date().toISOString()
+                  });
+                  if (created.ok) {
+                    setRoadmap(created.plan);
+                    const createdTasks = [];
+                    for (const [index, stage] of (data.stages || []).entries()) {
+                      const task = await createStudyTask(created.plan._id, {
+                        weekLabel: stage.title || 'Step ' + (index + 1),
+                        text: stage.description || 'Explore this step.'
+                      });
+                      if (task.ok) createdTasks.push(task.task);
+                    }
+                    setTasks(createdTasks);
+                    recordInteraction('ROADMAP_CREATED', 'pathway', slug);
+                  }
+                  setRoadmapBusy(false);
+                }}
+              >{roadmapBusy ? 'Building…' : 'Build my roadmap'}</button>
+            )}
+          </div>
+          {roadmap ? (
+            <div className="space-y-2">
+              {tasks.map(task => (
+                <label key={task._id} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(task.done)}
+                    onChange={async event => {
+                      const done = event.target.checked;
+                      setTasks(current => current.map(item => item._id === task._id ? { ...item, done } : item));
+                      await updateStudyTask(task._id, done);
+                      recordInteraction(done ? 'ROADMAP_TASK_COMPLETED' : 'ROADMAP_TASK_REOPENED', 'pathway', slug, { taskId: task._id });
+                    }}
+                  />
+                  <span className={task.done ? 'line-through text-slate-400' : ''}>
+                    <strong>{task.week_label || 'Step'}</strong>
+                    <span className="block text-sm text-slate-500 mt-1">{task.text}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-500">No roadmap yet. Build one when you are ready to turn exploration into action.</div>
+          )}
         </div>
       </section>
 
