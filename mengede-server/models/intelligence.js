@@ -208,8 +208,8 @@ const UserIntelligenceSchema = new Schema(
       index: true
     },
     signals: {
-      type: Schema.Types.Mixed,
-      default: {}
+      type: [Schema.Types.Mixed],
+      default: []
     },
     explored_universities: {
       type: [String],
