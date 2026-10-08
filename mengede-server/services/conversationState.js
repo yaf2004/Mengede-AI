@@ -81,7 +81,9 @@ export function estimateConversationState(text = '') {
       ? 'urgent'
       : topState === 'low_confidence'
         ? 'low_confidence'
-        : topState;
+        : topState === 'overwhelm'
+          ? 'overwhelmed'
+          : topState;
 
   return {
     state,
