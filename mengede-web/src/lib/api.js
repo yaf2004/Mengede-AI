@@ -134,6 +134,30 @@ export const recordInteraction = (
 export const getUserIntelligence = () =>
   call('/api/interactions/intelligence');
 
+export const getStudyPlans = () =>
+  call('/api/data/study-plans/' + encodeURIComponent(getDeviceId()));
+
+export const createStudyPlan = ({ title, weeks, startDate }) =>
+  call('/api/data/study-plans', {
+    method: 'POST',
+    body: { userId: getDeviceId(), title, weeks, startDate }
+  });
+
+export const getStudyPlanTasks = planId =>
+  call('/api/data/study-plans/' + encodeURIComponent(planId) + '/tasks');
+
+export const createStudyTask = (planId, { weekLabel, text }) =>
+  call('/api/data/study-plans/' + encodeURIComponent(planId) + '/tasks', {
+    method: 'POST',
+    body: { userId: getDeviceId(), weekLabel, text }
+  });
+
+export const updateStudyTask = (taskId, done) =>
+  call('/api/data/study-plans/tasks/' + encodeURIComponent(taskId), {
+    method: 'PATCH',
+    body: { done }
+  });
+
 export const getStudentProfile = () =>
   call('/api/data/profile/' + encodeURIComponent(getDeviceId()));
 
