@@ -33,8 +33,8 @@ when deployed.
 
 ## Backend setup: MongoDB, Gemini, and Links.et
 
-`mengede-server` needs these to do real work — the frontend still runs without them, but
-receipt verification and the data API won't.
+`mengede-server` needs these to do real work — the frontend can render without them, but
+Mongo-backed data, receipt verification, and some intelligence/resource features will be limited.
 
 - **MongoDB (required for the data API and receipt de-duplication):** copy the root
   `.env.example` to `.env` and set `MONGODB_URI` (a local Mongo via
@@ -45,11 +45,12 @@ receipt verification and the data API won't.
   `POST /api/verify-receipt` returns a clear 503 instead of silently accepting payments. See
   `mengede-server/README.md` for how the client handles links.et's async/retry behavior.
 - **Gemini (optional):** set `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`) to call the real
-  Interactions API from `lib/gemini.js`; without a key it returns a simulated response so local
-  dev still works. Reachable via the test endpoint (`POST /api/test/gemini`, or
-  `node test_gemini.js`); real calls are now logged per-user, per-day to the `AiUsage`
-  collection in Mongo. No page in the frontend calls it yet — the Assistant page talks to
-  Voxide's own AI directly, not Gemini.
+  Interactions API from `lib/gemini.js`; without a key the backend falls back to deterministic
+  reasoning so local dev still works. The Mengede assistant pipeline uses Gemini when available
+  and preserves the conversation/User Intelligence context regardless of the provider path.
+- **ScholarXIV (optional):** set `SCHOLARXIV_API_KEY` to add research-paper discovery to the
+  resource pipeline. When the key is absent or the API is unavailable, normal resource discovery
+  continues without papers.
 
 ## What's real vs. mocked
 
