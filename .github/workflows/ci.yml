@@ -29,6 +29,9 @@ jobs:
       - run: node --check services/assistant.js
       - run: node --check services/context.js
       - run: node --check services/resourceDiscovery.js
+      - run: node --check services/scholarxiv.js
+      - run: node --check services/conversationState.js
+      - run: node --check routes/recommendations.js
       - run: node --check services/search.js
 
   frontend:
