@@ -39,7 +39,7 @@ function normalizeLookup(value) {
     .trim()
     .toLowerCase()
     .replace(/[’']/g, '')
-    .replace(/\\s+/g, ' ');
+    .replace(/\s+/g, ' ');
 }
 
 function resolveUniversitySlug(value) {
