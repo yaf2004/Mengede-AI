@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Voxide Integration
+
+- fix: removed the duplicate askMengede voice capability so the Voxide agent has one canonical, conversation-aware path into Mengede's backend reasoning.
+- fix: profile updates from the Voxide capability bridge are now awaited before returning the tool result, so the agent receives the saved profile instead of a pending Promise.
+- feat: Voxide now receives a stable device-backed user identity through setUser, allowing the voice session to stay associated with the same Mengede student.
+
+
 ### User Intelligence
 
 ### University and Program Intelligence
