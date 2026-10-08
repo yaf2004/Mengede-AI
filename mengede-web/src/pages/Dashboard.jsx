@@ -108,11 +108,7 @@ export default function Dashboard() {
                   <PathwayCard
                     key={pathway.slug}
                     pathway={pathway}
-                    reason={
-                      pathway.matchScore
-                        ? 'Matches signals currently associated with your profile.'
-                        : 'Worth exploring before making a decision.'
-                    }
+                    reason={pathway.reason}
                   />
                 ))}
               </div>
