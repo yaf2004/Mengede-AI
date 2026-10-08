@@ -64,3 +64,15 @@ If `MONGODB_URI` isn't set, the server still starts (with a warning), but every 
   is unset) and logs real calls to the `AiUsage` collection.
 - `/api/data/*` — CRUD for student profiles, conversations + messages, quiz results, and study
   plans + tasks. See `routes/data.js` for the full list.
+
+## Intelligence and university exploration
+
+The active branch includes verified university/program relationships, User Intelligence signals,
+recommendation ranking, conversation-state estimation, resource discovery, ScholarXIV paper
+discovery, and persisted exploration roadmaps. Program relationships are evidence-backed and
+should not be inferred from department names alone.
+
+Key endpoints include `/api/universities`, `/api/programs`, `/api/resources/discover`,
+`/api/interactions`, and `/api/recommendations`. The assistant route feeds profile and
+intelligence context into Gemini and returns the conversation state estimate used to adjust
+response style without diagnosing the student.
