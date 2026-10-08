@@ -4,6 +4,7 @@ import {
   discoverResources,
   getResources,
   getUniversity,
+  getPrograms,
   recordInteraction,
 } from '../lib/api.js';
 import ResourceCard from '../components/ResourceCard.jsx';
@@ -13,15 +14,17 @@ export default function UniversityExplorer() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
   const [resources, setResources] = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const [universityResult, resourceResult] = await Promise.all([
+      const [universityResult, resourceResult, programResult] = await Promise.all([
         getUniversity(slug),
         getResources({ university: slug }),
+        getPrograms({ university: slug, level: 'undergraduate' }),
       ]);
 
       if (cancelled) return;
@@ -33,6 +36,7 @@ export default function UniversityExplorer() {
 
       const university = universityResult.university;
       setData(university);
+      if (programResult.ok) setPrograms(programResult.programs);
       recordInteraction('UNIVERSITY_EXPLORED', 'university', slug);
 
       let found = resourceResult.ok ? resourceResult.resources : [];
@@ -106,6 +110,41 @@ export default function UniversityExplorer() {
             </span>
           ))}
         </div>
+      </section>
+
+
+      <section className="mt-8">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-bold">Verified undergraduate programs</h2>
+            <p className="text-sm text-slate-500">Program-level evidence, not department-name inference.</p>
+          </div>
+          <button
+            type="button"
+            className="pill glass text-xs"
+            onClick={() => recordInteraction('UNIVERSITY_SAVED', 'university', slug)}
+          >
+            Save university
+          </button>
+        </div>
+        {programs.length ? (
+          <div className="grid md:grid-cols-2 gap-3">
+            {programs.map(program => (
+              <Link
+                key={program._id || program.pathway_slug}
+                to={'/pathways/' + program.pathway_slug}
+                onClick={() => recordInteraction('PATHWAY_ACCEPTED', 'pathway', program.pathway_slug, { university: slug })}
+                className="card p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="font-bold">{program.program_name}</div>
+                <div className="text-sm text-slate-500 mt-1">{program.degree} · {program.level}</div>
+                <div className="text-xs text-emerald-600 mt-2">Verified source: {program.source_type}</div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="card p-5 text-sm text-slate-500">No verified undergraduate program relationship is currently cataloged.</div>
+        )}
       </section>
 
       <section className="mt-8">
