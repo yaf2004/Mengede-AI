@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Icon } from '../lib/icons.jsx';
 import { recordInteraction } from '../lib/api.js';
 
@@ -28,17 +29,20 @@ function safeEmbedUrl(value) {
 }
 
 export default function ResourceCard({ resource }) {
+  const [state, setState] = useState('');
   const id = resource.external_id || resource._id || resource.url;
   const embedUrl =
     resource.type === 'video'
       ? safeEmbedUrl(resource.embed_url || resource.embedUrl)
       : null;
 
-  const track = type =>
-    recordInteraction(type, 'resource', id, {
+  const track = type => {
+    setState(type);
+    return recordInteraction(type, 'resource', id, {
       provider: resource.provider,
       title: resource.title,
     });
+  };
 
   return (
     <article className="card overflow-hidden">
@@ -79,7 +83,7 @@ export default function ResourceCard({ resource }) {
             onClick={() => track('RESOURCE_SAVED')}
             className="pill glass text-xs"
           >
-            <Icon name="save" className="w-3.5 h-3.5" /> Save
+            <Icon name="save" className="w-3.5 h-3.5" /> {state === 'RESOURCE_SAVED' ? 'Saved' : 'Save'}
           </button>
 
           <button
@@ -87,8 +91,10 @@ export default function ResourceCard({ resource }) {
             onClick={() => track('RESOURCE_COMPLETED')}
             className="pill glass text-xs"
           >
-            <Icon name="check" className="w-3.5 h-3.5" /> Useful / Done
+            <Icon name="check" className="w-3.5 h-3.5" /> {state === 'RESOURCE_COMPLETED' ? 'Completed' : 'Useful / Done'}
           </button>
+
+          <button type="button" onClick={() => track('RESOURCE_DISMISSED')} className="pill glass text-xs">Not useful</button>
 
           {resource.url && (
             <a
