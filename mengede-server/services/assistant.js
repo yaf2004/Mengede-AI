@@ -2,6 +2,7 @@ import { Conversation, Message } from '../models/index.js';
 import { interact } from '../lib/gemini.js';
 import { buildUserContext } from './context.js';
 import { buildDeterministicResponse } from './reasoningEngine.js';
+import { estimateConversationState } from './conversationState.js';
 import {
   getPathway,
   getUniversity,
@@ -37,7 +38,7 @@ const SCHEMA = {
   required: ['message', 'intent', 'recommendations', 'actions']
 };
 
-function buildPrompt(context, studentText) {
+function buildPrompt(context, studentText, conversationState) {
   const profile = context.profile || {};
   const intelligence = context.intelligence || {};
 
@@ -78,6 +79,10 @@ function buildPrompt(context, studentText) {
     '',
     'CURRENT STUDENT MESSAGE:',
     studentText,
+    '',
+    'CONVERSATION STATE ESTIMATE:',
+    JSON.stringify(conversationState),
+    'Use this only to adjust response style. Do not diagnose the student or infer a medical condition.',
     '',
     'Return structured JSON matching the provided schema.',
     'Recommendations must only use valid university or pathway IDs from the available context.',
@@ -186,7 +191,8 @@ export async function runAssistant({
     conversation._id
   );
 
-  const prompt = buildPrompt(context, text);
+  const conversationState = estimateConversationState(text);
+  const prompt = buildPrompt(context, text, conversationState);
 
   const deterministic = buildDeterministicResponse({
     text,
@@ -258,6 +264,7 @@ export async function runAssistant({
     sources: result.sources || [],
     conversationId: conversation._id.toString(),
     grounded: Boolean(result.grounded),
+    conversationState,
   };
 
   await Message.create({
