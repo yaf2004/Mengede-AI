@@ -1,7 +1,7 @@
 import express from 'express';
 import { Recommendation } from '../models/intelligence.js';
 import { buildUserContext } from '../services/context.js';
-import { listUniversities, listPathways } from '../services/catalog.js';
+import { listUniversities, listPathways, listUniversityPrograms } from '../services/catalog.js';
 import { requireDeviceId } from '../lib/deviceId.js';
 
 const router = express.Router();
@@ -74,14 +74,43 @@ router.get('/', async (req, res) => {
       intelligence.explored_universities || []
     );
 
-    const [pathways, universities] = await Promise.all([
+    const [pathways, universities, programs] = await Promise.all([
       listPathways(),
-      listUniversities()
+      listUniversities(),
+      listUniversityPrograms({ level: 'undergraduate' })
     ]);
+
+    const signalStrength = new Map(
+      (intelligence.signals || []).map(signal => [
+        signal.key,
+        Number(signal.strength) || 0
+      ])
+    );
+
+    const pathwayUniversities = new Map();
+    const universityPathways = new Map();
+
+    for (const program of programs) {
+      if (!pathwayUniversities.has(program.pathway_slug)) {
+        pathwayUniversities.set(program.pathway_slug, new Set());
+      }
+      pathwayUniversities.get(program.pathway_slug).add(program.university_slug);
+
+      if (!universityPathways.has(program.university_slug)) {
+        universityPathways.set(program.university_slug, new Set());
+      }
+      universityPathways.get(program.university_slug).add(program.pathway_slug);
+    }
 
     const rankedPathways = pathways
       .map(pathway => {
         const explored = exploredPathways.has(pathway.slug);
+
+        const signalBoost = signalStrength.get(`pathway_interest:${pathway.slug}`) || 0;
+        const explorationBoost = signalStrength.get(`pathway_explore:${pathway.slug}`) || 0;
+        const roadmapBoost = [...signalStrength.entries()]
+          .filter(([key]) => key.startsWith('roadmap_progress:') && key.includes(pathway.slug))
+          .reduce((sum, [, strength]) => sum + strength, 0);
 
         const matchScore =
           scoreEntity(
@@ -89,6 +118,9 @@ router.get('/', async (req, res) => {
             tokens,
             ['name', 'description', 'fields', 'skills', 'subjects', 'careers']
           ) +
+          signalBoost * 5 +
+          explorationBoost * 2 +
+          roadmapBoost * 2 +
           (explored ? 5 : 0);
 
         return {
@@ -103,7 +135,7 @@ router.get('/', async (req, res) => {
     const exploredPathwayUniversities = new Set(
       pathways.flatMap(pathway =>
         exploredPathways.has(pathway.slug)
-          ? (pathway.universitySlugs || [])
+          ? [...(pathwayUniversities.get(pathway.slug) || [])]
           : []
       )
     );
@@ -114,12 +146,27 @@ router.get('/', async (req, res) => {
         const pathwayConnection =
           exploredPathwayUniversities.has(university.slug);
 
+        const universitySignalBoost =
+          signalStrength.get(`university_interest:${university.slug}`) || 0;
+        const universityExploreBoost =
+          signalStrength.get(`university_explore:${university.slug}`) || 0;
+        const connectedPathwayBoost = [...(universityPathways.get(university.slug) || [])]
+          .reduce(
+            (sum, pathwaySlug) =>
+              sum +
+              (signalStrength.get(`pathway_interest:${pathwaySlug}`) || 0) * 2,
+            0
+          );
+
         const matchScore =
           scoreEntity(
             university,
             tokens,
             ['name', 'city', 'region', 'departments', 'tags']
           ) +
+          universitySignalBoost * 5 +
+          universityExploreBoost * 2 +
+          connectedPathwayBoost +
           (pathwayConnection ? 3 : 0) +
           (explored ? 4 : 0);
 
