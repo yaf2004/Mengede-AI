@@ -8,7 +8,10 @@ const SIGNAL_STRENGTH = {
   RESOURCE_SAVED: 0.7,
   RESOURCE_COMPLETED: 0.85,
   PATHWAY_ACCEPTED: 0.7,
-  UNIVERSITY_SAVED: 0.7
+  UNIVERSITY_SAVED: 0.7,
+  UNIVERSITY_EXPLORED: 0.25,
+  PATHWAY_EXPLORED: 0.25,
+  RESOURCE_OPENED: 0.15
 };
 
 const SIGNAL_PREFIX = {
@@ -16,7 +19,10 @@ const SIGNAL_PREFIX = {
   RESOURCE_SAVED: 'resource_interest:',
   RESOURCE_COMPLETED: 'resource_completion:',
   PATHWAY_ACCEPTED: 'pathway_interest:',
-  UNIVERSITY_SAVED: 'university_interest:'
+  UNIVERSITY_SAVED: 'university_interest:',
+  UNIVERSITY_EXPLORED: 'university_explore:',
+  PATHWAY_EXPLORED: 'pathway_explore:',
+  RESOURCE_OPENED: 'resource_open:'
 };
 
 function clamp(value, min = 0, max = 1) {
@@ -51,9 +57,14 @@ async function updateSignal({
     user_id: userId
   }).lean();
 
-  const signals = Array.isArray(existing?.signals)
-    ? existing.signals
-    : [];
+  const signals = Array.isArray(existing?.signals) ? existing.signals : [];
+
+  if (existing && !Array.isArray(existing.signals)) {
+    await UserIntelligence.updateOne(
+      { user_id: userId },
+      { $set: { signals: [] } }
+    );
+  }
 
   const current = signals.find((signal) => signal.key === key);
 
