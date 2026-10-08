@@ -1,5 +1,6 @@
 import { interact } from '../lib/gemini.js';
 import { searchYouTube } from './search.js';
+import { searchScholarXIV, isScholarXIVConfigured } from './scholarxiv.js';
 
 const RESOURCE_TYPES = new Set([
   'video',
@@ -66,6 +67,10 @@ function youtubeEmbed(url) {
 export async function discoverResources(query) {
   if (!query?.trim()) return [];
 
+  const scholarXivPromise = isScholarXIVConfigured()
+    ? searchScholarXIV(query, { maxResults: 5 }).catch(() => [])
+    : Promise.resolve([]);
+
   const prompt = [
     'Find useful current public resources for an Ethiopian student exploring a university or pathway.',
     'Prioritize YouTube videos that can be embedded, official university information, and clearly attributed public student discussions.',
@@ -82,7 +87,11 @@ export async function discoverResources(query) {
   });
 
   if (!result.ok) {
-    return searchYouTube(query, { maxResults: 6 });
+    const [videos, papers] = await Promise.all([
+      searchYouTube(query, { maxResults: 6 }),
+      scholarXivPromise
+    ]);
+    return [...papers, ...videos];
   }
 
   try {
@@ -90,7 +99,7 @@ export async function discoverResources(query) {
 
     const groundedUrls = new Set((result.sources || []).map(source => source.url));
 
-    return (data.resources || [])
+    const discovered = (data.resources || [])
       .filter(resource => resource?.url && groundedUrls.has(resource.url))
       .map(resource => ({
         ...resource,
@@ -101,7 +110,14 @@ export async function discoverResources(query) {
           resource.embedUrl ||
           (resource.type === 'video' ? youtubeEmbed(resource.url) : undefined),
       }));
+
+    const papers = await scholarXivPromise;
+    return [...papers, ...discovered];
   } catch {
-    return searchYouTube(query, { maxResults: 6 });
+    const [videos, papers] = await Promise.all([
+      searchYouTube(query, { maxResults: 6 }),
+      scholarXivPromise
+    ]);
+    return [...papers, ...videos];
   }
 }
