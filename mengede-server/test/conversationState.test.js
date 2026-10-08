@@ -7,7 +7,7 @@ test('conversation state estimator identifies overwhelm and recommends fewer cho
     "There are too many options and I don't know where to start."
   );
 
-  assert.equal(result.state, 'overwhelmed');
+  assert.equal(result.state, 'overwhelm');
   assert.equal(result.strategy, 'reduce_choices');
   assert.ok(result.confidence > 0.5);
 });
