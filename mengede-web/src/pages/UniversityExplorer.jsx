@@ -133,7 +133,7 @@ export default function UniversityExplorer() {
               <Link
                 key={program._id || program.pathway_slug}
                 to={'/pathways/' + program.pathway_slug}
-                onClick={() => recordInteraction('PATHWAY_ACCEPTED', 'pathway', program.pathway_slug, { university: slug })}
+                onClick={() => recordInteraction('PATHWAY_EXPLORED', 'pathway', program.pathway_slug, { university: slug })}
                 className="card p-4 hover:shadow-md transition-shadow"
               >
                 <div className="font-bold">{program.program_name}</div>
