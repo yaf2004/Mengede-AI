@@ -5,6 +5,7 @@ import { useSettings } from '../context/SettingsContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { ai, host, initVoxide } from '../lib/voxide.js';
 import { saveStudentProfile } from '../lib/api.js';
+import { getDeviceId } from '../lib/device.js';
 
 const dedupe = list => {
   const seen = new Set();
@@ -26,6 +27,11 @@ export default function VoxideBridge() {
 
   useEffect(() => {
     initVoxide();
+  }, []);
+
+  useEffect(() => {
+    // Give Voxide a stable user identity so its session can stay tied to this student.
+    ai.setUser({ userId: getDeviceId() });
   }, []);
 
   useEffect(() => {
