@@ -5,6 +5,7 @@ import {
   getPathway,
   getResources,
   getUniversities,
+  getPrograms,
   recordInteraction
 } from '../lib/api.js';
 import ResourceCard from '../components/ResourceCard.jsx';
@@ -21,11 +22,12 @@ export default function PathwayExplorer() {
     let cancelled = false;
 
     async function load() {
-      const [pathwayResult, resourceResult, universityResult] =
+      const [pathwayResult, resourceResult, universityResult, programResult] =
         await Promise.all([
           getPathway(slug),
           getResources({ pathway: slug }),
           getUniversities(),
+          getPrograms({ pathway: slug, level: 'undergraduate' }),
         ]);
 
       if (cancelled) return;
@@ -52,8 +54,10 @@ export default function PathwayExplorer() {
 
       if (!cancelled) setResources(foundResources);
 
-      if (universityResult.ok) {
-        const allowed = new Set(pathwayResult.pathway.universitySlugs || []);
+      if (universityResult.ok && programResult.ok) {
+        const allowed = new Set(
+          programResult.programs.map(program => program.university_slug)
+        );
         setUniversities(
           universityResult.universities.filter(university =>
             allowed.has(university.slug)
