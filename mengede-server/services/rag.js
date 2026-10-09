@@ -78,8 +78,8 @@ export function cosineSimilarity(a, b) {
   return normA && normB ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : -1;
 }
 
-function chunkId(sourceUrl, index) {
-  return createHash('sha256').update(`${sourceUrl}\n${index}`).digest('hex');
+function chunkId(sourceUrl, title, index) {
+  return createHash('sha256').update(`${sourceUrl}\n${title}\n${index}`).digest('hex');
 }
 
 export function isRagConfigured() {
