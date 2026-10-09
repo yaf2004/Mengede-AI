@@ -15,6 +15,7 @@ import programsRouter from './routes/programs.js';
 import resourcesRouter from './routes/resources.js';
 import interactionsRouter from './routes/interactions.js';
 import recommendationsRouter from './routes/recommendations.js';
+import knowledgeRouter from './routes/knowledge.js';
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/programs', programsRouter);
 app.use('/api/resources', resourcesRouter);
 app.use('/api/interactions', interactionsRouter);
 app.use('/api/recommendations', recommendationsRouter);
+app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/bookings', bookingsRouter);
 app.use('/api/mentors', mentorsRouter);
 app.use('/api/links', linksEtRouter);
