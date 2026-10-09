@@ -172,7 +172,7 @@ export async function listResources({
   const query = {};
 
   if (universitySlug) {
-    query.university_slug = universitySlug;
+    query.university_slug = resolveUniversitySlug(universitySlug);
   }
 
   if (pathwaySlug) {
