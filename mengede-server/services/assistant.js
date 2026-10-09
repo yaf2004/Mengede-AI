@@ -278,7 +278,7 @@ export async function runAssistant({
     score: Number(item.score.toFixed(3)),
     chunkIndex: item.chunkIndex,
   }));
-  const sources = [...(result.sources || []), ...ragSources]
+  const sources = [...(result.sources || []), ...(!result.simulated ? ragSources : [])]
     .filter((source, index, all) => source.url && all.findIndex(candidate => candidate.url === source.url) === index);
 
   const response = {
