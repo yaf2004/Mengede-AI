@@ -7,7 +7,7 @@ const CHUNK_SIZE = 1800;
 const CHUNK_OVERLAP = 250;
 const MAX_SEARCH_CORPUS = 5000;
 
-function splitText(input) {
+export function splitText(input) {
   const text = String(input || '').replace(/\r\n/g, '\n').trim();
   if (!text) return [];
 
@@ -65,7 +65,7 @@ async function embedText(text, taskType) {
   return values;
 }
 
-function cosineSimilarity(a, b) {
+export function cosineSimilarity(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || !a.length) return -1;
   let dot = 0;
   let normA = 0;
