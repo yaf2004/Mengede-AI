@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+
+### Knowledge Base and RAG
+
+- feat: added a persistent MongoDB `KnowledgeChunk` collection with Gemini Embedding vectors, overlapping text chunking, and cosine-similarity retrieval.
+- feat: assistant prompts now include retrieved internal evidence and return associated source URLs when the live model is used.
+- feat: added protected `POST /api/knowledge/ingest` and semantic `GET /api/knowledge/search` endpoints, with a configurable rate limit.
+- feat: added `npm run index:knowledge` to embed the evidence-backed university-program catalog into the RAG corpus.
+- test: added chunking and cosine-similarity tests and CI syntax checks for RAG modules.
+- note: the initial retrieval implementation scans a bounded corpus of up to 5,000 chunks in application memory; use MongoDB Atlas Vector Search before scaling to a large corpus. Additional official documents and papers still need to be ingested.
+
+
 ### Voxide Integration
 
 - fix: removed the duplicate askMengede voice capability so the Voxide agent has one canonical, conversation-aware path into Mengede's backend reasoning.
