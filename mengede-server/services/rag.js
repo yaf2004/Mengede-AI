@@ -111,10 +111,10 @@ export async function ingestKnowledgeDocument({
     );
     operations.push({
       updateOne: {
-        filter: { chunk_id: chunkId(sourceUrl.trim(), index) },
+        filter: { chunk_id: chunkId(sourceUrl.trim(), title.trim(), index) },
         update: {
           $set: {
-            chunk_id: chunkId(sourceUrl.trim(), index),
+            chunk_id: chunkId(sourceUrl.trim(), title.trim(), index),
             source_url: sourceUrl.trim(),
             source_title: title.trim(),
             source_type: sourceType,
@@ -134,6 +134,7 @@ export async function ingestKnowledgeDocument({
   await KnowledgeChunk.bulkWrite(operations, { ordered: true });
   await KnowledgeChunk.deleteMany({
     source_url: sourceUrl.trim(),
+    source_title: title.trim(),
     chunk_index: { $gte: chunks.length }
   });
 
