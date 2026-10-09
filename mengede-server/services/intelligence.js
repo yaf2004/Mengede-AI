@@ -13,7 +13,8 @@ const SIGNAL_STRENGTH = {
   PATHWAY_EXPLORED: 0.25,
   RESOURCE_OPENED: 0.15,
   ROADMAP_CREATED: 0.35,
-  ROADMAP_TASK_COMPLETED: 0.6
+  ROADMAP_TASK_COMPLETED: 0.6,
+  ROADMAP_TASK_REOPENED: 0.25
 };
 
 const SIGNAL_PREFIX = {
@@ -26,7 +27,8 @@ const SIGNAL_PREFIX = {
   PATHWAY_EXPLORED: 'pathway_explore:',
   RESOURCE_OPENED: 'resource_open:',
   ROADMAP_CREATED: 'roadmap_created:',
-  ROADMAP_TASK_COMPLETED: 'roadmap_progress:'
+  ROADMAP_TASK_COMPLETED: 'roadmap_progress:',
+  ROADMAP_TASK_REOPENED: 'roadmap_progress:'
 };
 
 function clamp(value, min = 0, max = 1) {
@@ -71,6 +73,32 @@ async function updateSignal({
   }
 
   const current = signals.find((signal) => signal.key === key);
+
+  if (type === 'ROADMAP_TASK_REOPENED') {
+    if (!current) return;
+
+    const nextStrength = clamp(
+      (Number(current.strength) || 0) - baseStrength
+    );
+
+    await UserIntelligence.updateOne(
+      {
+        user_id: userId,
+        'signals.key': key
+      },
+      {
+        $set: {
+          'signals.$.value': nextStrength > 0,
+          'signals.$.strength': nextStrength
+        },
+        $push: {
+          'signals.$.evidence': buildEvidence(type, metadata)
+        }
+      }
+    );
+
+    return;
+  }
 
   if (!current) {
     await UserIntelligence.findOneAndUpdate(
