@@ -76,3 +76,32 @@ Key endpoints include `/api/universities`, `/api/programs`, `/api/resources/disc
 `/api/interactions`, and `/api/recommendations`. The assistant route feeds profile and
 intelligence context into Gemini and returns the conversation state estimate used to adjust
 response style without diagnosing the student.
+
+## Knowledge Base and RAG
+
+Mengede keeps structured facts in the MongoDB catalog (universities, pathways, and evidence-backed university-program relationships). RAG stores document chunks plus Gemini embeddings in the `KnowledgeChunk` collection and retrieves relevant passages for the assistant prompt. Retrieved text is treated as evidence, never as instructions.
+
+### Configure and index the program catalog
+
+Set these server-side values in `.env`:
+
+```env
+GEMINI_API_KEY=your_server_side_key
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+KNOWLEDGE_INGEST_KEY=use-a-long-random-secret
+```
+
+Then run from `mengede-server`:
+
+```bash
+npm run index:knowledge
+```
+
+The script embeds the existing university-program catalog records and stores the vectors in MongoDB. Re-run it after changing that catalog. It requires a working Gemini API key and MongoDB connection.
+
+### Knowledge API
+
+- `GET /api/knowledge/search?q=computer%20science` — semantic search over indexed chunks.
+- `POST /api/knowledge/ingest` — index a trusted text document. Send `x-knowledge-ingest-key: <KNOWLEDGE_INGEST_KEY>` and JSON containing `title`, `sourceUrl`, `sourceType`, and `text`. Supported source types include `university`, `program`, `legislation`, `published_paper`, `official_document`, `research`, and `other`.
+
+The initial implementation scans up to 5,000 stored vectors in application memory and ranks them by cosine similarity. This is intentionally a small curated-corpus implementation; move to a MongoDB Atlas Vector Search index before scaling to a large document collection. Only ingest material you are permitted to store, and review source freshness and evidence before promoting claims to the structured catalog.
