@@ -193,7 +193,7 @@ const KnowledgeChunkSchema = new Schema(
   },
   { timestamps: true }
 );
-KnowledgeChunkSchema.index({ source_url: 1, chunk_index: 1 }, { unique: true });
+KnowledgeChunkSchema.index({ source_url: 1, source_title: 1, chunk_index: 1 }, { unique: true });
 
 const InteractionEventSchema = new Schema(
   {
