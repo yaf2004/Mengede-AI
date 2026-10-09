@@ -177,6 +177,24 @@ const ResourceSchema = new Schema(
   { timestamps: true }
 );
 
+const KnowledgeChunkSchema = new Schema(
+  {
+    chunk_id: { type: String, required: true, unique: true, index: true },
+    source_url: { type: String, required: true, index: true },
+    source_title: { type: String, required: true },
+    source_type: { type: String, default: 'other', index: true },
+    text: { type: String, required: true },
+    chunk_index: { type: Number, required: true },
+    language: { type: String, default: 'en' },
+    embedding_model: { type: String, required: true },
+    embedding: { type: [Number], required: true },
+    metadata: { type: Schema.Types.Mixed, default: {} },
+    ingested_at: { type: Date, default: Date.now }
+  },
+  { timestamps: true }
+);
+KnowledgeChunkSchema.index({ source_url: 1, chunk_index: 1 }, { unique: true });
+
 const InteractionEventSchema = new Schema(
   {
     user_id: {
@@ -278,6 +296,9 @@ export const UniversityProgram =
 
 export const Resource =
   models.Resource || model('Resource', ResourceSchema);
+
+export const KnowledgeChunk =
+  models.KnowledgeChunk || model('KnowledgeChunk', KnowledgeChunkSchema);
 
 export const InteractionEvent =
   models.InteractionEvent ||
