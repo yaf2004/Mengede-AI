@@ -35,6 +35,18 @@ const assistantLimiter = rateLimit({
     }),
 });
 
+const knowledgeLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: Number(process.env.KNOWLEDGE_RATE_LIMIT) || 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, res) =>
+    res.status(429).json({
+      ok: false,
+      error: 'Too many knowledge search requests. Please wait a minute and try again.',
+    }),
+});
+
 const discoveryLimiter = rateLimit({
   windowMs: 60_000,
   limit: Number(process.env.DISCOVERY_RATE_LIMIT) || 20,
@@ -71,7 +83,7 @@ app.use('/api/programs', programsRouter);
 app.use('/api/resources', resourcesRouter);
 app.use('/api/interactions', interactionsRouter);
 app.use('/api/recommendations', recommendationsRouter);
-app.use('/api/knowledge', knowledgeRouter);
+app.use('/api/knowledge', knowledgeLimiter, knowledgeRouter);
 app.use('/api/bookings', bookingsRouter);
 app.use('/api/mentors', mentorsRouter);
 app.use('/api/links', linksEtRouter);
