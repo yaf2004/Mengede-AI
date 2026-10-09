@@ -142,9 +142,10 @@ export async function ingestKnowledgeDocument({
 
 export async function searchKnowledge(query, { limit = 5, sourceType } = {}) {
   if (!query?.trim() || !isRagConfigured()) return [];
-  const queryEmbedding = await embedText(query.trim(), 'RETRIEVAL_QUERY');
   const filter = { embedding_model: EMBEDDING_MODEL, embedding: { $exists: true } };
   if (sourceType) filter.source_type = sourceType;
+  if (!(await KnowledgeChunk.exists(filter))) return [];
+  const queryEmbedding = await embedText(query.trim(), 'RETRIEVAL_QUERY');
 
   // Suitable for the initial curated corpus. Move to MongoDB Atlas Vector Search
   // once the corpus grows beyond this bounded in-process scan.
