@@ -13,7 +13,8 @@
   "scripts": {
     "test": "node --test",
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "index:knowledge": "node scripts/ingestKnowledgeCatalog.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
