@@ -109,6 +109,6 @@ if (!isMongoConfigured()) {
 
 const PORT = Number(process.env.PORT) || 4000;
 
-app.listen(PORT, () => {
-  console.log(`Mengede API listening on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Mengede API listening on port ${PORT}`);
 });
