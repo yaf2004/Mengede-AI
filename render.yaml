@@ -3,7 +3,7 @@ services:
     name: mengede-ai
     runtime: node
     plan: free
-    buildCommand: npm ci --prefix mengede-server && npm ci --prefix mengede-web && npm run build --prefix mengede-web
+    buildCommand: npm ci --prefix mengede-server && npm ci --include=dev --prefix mengede-web && npm run build --prefix mengede-web
     startCommand: npm start --prefix mengede-server
     healthCheckPath: /api/health/ready
     envVars:
