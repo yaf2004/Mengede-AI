@@ -2,7 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { connectMongo, isMongoConfigured } from './lib/mongo.js';
+import mongoose, { connectMongo, isMongoConfigured } from './lib/mongo.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import verifyReceiptRouter from './routes/verifyReceipt.js';
 import bookingsRouter from './routes/bookings.js';
 import mentorsRouter from './routes/mentors.js';
@@ -18,6 +20,7 @@ import recommendationsRouter from './routes/recommendations.js';
 import knowledgeRouter from './routes/knowledge.js';
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.disable('x-powered-by');
 app.use(cors());
@@ -93,8 +96,30 @@ app.get('/api/health', (_req, res) =>
   res.json({
     ok: true,
     mongoConfigured: isMongoConfigured(),
+    mongoConnected: mongoose.connection.readyState === 1,
   })
 );
+
+// Render readiness check: do not report healthy until MongoDB is connected.
+app.get('/api/health/ready', (_req, res) => {
+  const mongoConnected = mongoose.connection.readyState === 1;
+  const ready = isMongoConfigured() && mongoConnected;
+  res.status(ready ? 200 : 503).json({
+    ok: ready,
+    mongoConfigured: isMongoConfigured(),
+    mongoConnected,
+  });
+});
+
+// In production, serve the built React app from this same origin as the API.
+if (process.env.NODE_ENV === 'production') {
+  const webDist = path.resolve(__dirname, '../mengede-web/dist');
+  app.use(express.static(webDist));
+  app.get('/{*path}', (req, res, next) => {
+    if (req.path === '/api' || req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(webDist, 'index.html'));
+  });
+}
 
 app.use((req, res) => {
   res.status(404).json({
