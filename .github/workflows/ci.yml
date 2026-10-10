@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - feat/intelligence-university-exploration
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mengede-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mengede-server/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+      - run: node --check server.js
+      - run: node --check lib/gemini.js
+      - run: node --check services/assistant.js
+      - run: node --check services/context.js
+      - run: node --check services/resourceDiscovery.js
+      - run: node --check services/scholarxiv.js
+      - run: node --check services/conversationState.js
+      - run: node --check routes/recommendations.js
+      - run: node --check services/search.js
+      - run: node --check services/rag.js
+      - run: node --check routes/knowledge.js
+      - run: node --check scripts/ingestKnowledgeCatalog.js
+      - run: node --check models/intelligence.js
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mengede-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mengede-web/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

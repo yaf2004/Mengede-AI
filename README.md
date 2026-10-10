@@ -33,8 +33,8 @@ when deployed.
 
 ## Backend setup: MongoDB, Gemini, and Links.et
 
-`mengede-server` needs these to do real work — the frontend still runs without them, but
-receipt verification and the data API won't.
+`mengede-server` needs these to do real work — the frontend can render without them, but
+Mongo-backed data, receipt verification, and some intelligence/resource features will be limited.
 
 - **MongoDB (required for the data API and receipt de-duplication):** copy the root
   `.env.example` to `.env` and set `MONGODB_URI` (a local Mongo via
@@ -45,57 +45,30 @@ receipt verification and the data API won't.
   `POST /api/verify-receipt` returns a clear 503 instead of silently accepting payments. See
   `mengede-server/README.md` for how the client handles links.et's async/retry behavior.
 - **Gemini (optional):** set `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`) to call the real
-  Interactions API from `lib/gemini.js`; without a key it returns a simulated response so local
-  dev still works. Reachable via the test endpoint (`POST /api/test/gemini`, or
-  `node test_gemini.js`); real calls are now logged per-user, per-day to the `AiUsage`
-  collection in Mongo. No page in the frontend calls it yet — the Assistant page talks to
-  Voxide's own AI directly, not Gemini.
+  Interactions API from `lib/gemini.js`; without a key the backend falls back to deterministic
+  reasoning so local dev still works. The Mengede assistant pipeline uses Gemini when available
+  and preserves the conversation/User Intelligence context regardless of the provider path.
+- **ScholarXIV (optional):** set `SCHOLARXIV_API_KEY` to add research-paper discovery to the
+  resource pipeline. When the key is absent or the API is unavailable, normal resource discovery
+  continues without papers.
 
 ## What's real vs. mocked
 
 **Real, working code:**
-- The whole frontend is componentized (Sidebar, Orb, GlassToggle, pages, contexts for
-  theme/settings/app state) — no CDN Tailwind, built with `@tailwindcss/vite`.
-- The booking flow is fully wired: free mentors book instantly, paid mentors go through a
-  real `POST /api/verify-receipt` call to the Express backend, which calls the real
-  [links.et](https://links.et) API (`lib/linksEt.js`) to confirm the receipt directly with the
-  bank, and persists used receipts in MongoDB (`UsedReceipt`) so a receipt can't be reused even
-  across server restarts. **Requires `LINKS_ET_API_KEY` and `MONGODB_URI` to be set** — without
-  them the route returns a clear error instead of silently accepting payments.
-- The voice assistant is real: `@voxide/react` handles speech-to-text, the AI agent and voice
-  replies. The agent can navigate the app, list mentors, book free sessions and save profile
-  details through capabilities registered in `mengede-web/src/lib/voxide.js`.
+- The whole frontend is componentized (Sidebar, Orb, GlassToggle, pages, contexts for theme/settings/app state) — no CDN Tailwind, built with `@tailwindcss/vite`.
+- The booking flow is fully wired: free mentors book instantly, while paid mentors use `POST /api/verify-receipt`, links.et, and Mongo-backed receipt de-duplication.
+- Voxide remains the voice interface. Its capabilities navigate the app, update the profile, list mentors, book free sessions, and send university/career/pathway questions through `askMengede` into the backend intelligence pipeline.
+- The active backend uses MongoDB/Mongoose; the old Postgres/Drizzle scaffold is no longer part of the active branch.
+- The assistant pipeline loads profile + User Intelligence + catalog context, estimates short-term conversation state, uses Gemini for structured reasoning when available, and falls back to deterministic reasoning when Gemini/search is unavailable.
+- University exploration uses verified program-level relationships through `/api/universities` and `/api/programs`; it does not infer an undergraduate program merely from a department name.
+- Interaction signals update User Intelligence and feed recommendations. University/pathway exploration, saves, resource interactions, roadmap creation, and roadmap progress are represented as evidence.
+- Pathway exploration can generate a persisted roadmap and tasks in MongoDB; completing roadmap tasks feeds intelligence signals.
+- Resource discovery combines grounded Gemini/YouTube discovery with optional ScholarXIV paper discovery when `SCHOLARXIV_API_KEY` is configured.
 - Dark mode, voice settings, and language preference persist to `localStorage`.
-- `mengede-server/lib/linksEt.js` makes genuine calls to the links.et API (`/api/verify`,
-  `/api/verify-image`) when `LINKS_ET_API_KEY` is set: it submits with `waitMs` and polls on a
-  `202` rather than holding a socket open through a slow bank, and follows links.et's retry
-  guidance (auto-retry `rate_limited`, but not `502`/busy-bank `400`, to protect view-limited
-  receipts like Siinqee's). `lib/receiptParsing.js` normalizes the per-provider `receipt` shape
-  into a plain `{ bank, amount }` for the six providers links.et's docs describe in detail;
-  other supported banks get a best-effort parse flagged as unconfirmed.
-- `mengede-server/lib/gemini.js` makes genuine calls to the Gemini Interactions API when
-  `GEMINI_API_KEY` is set, with a retry ladder for rate limits/server errors; real calls are
-  now tracked per-user, per-day in the `AiUsage` Mongo collection.
-- A real MongoDB-backed data API (`/api/data/*`, see `mengede-server/routes/data.js`) covers
-  student profiles, conversations + messages, quiz results, and study plans + tasks —
-  replacing the earlier Postgres/Drizzle scaffold that nothing actually read from.
 
-**Still mocked or not yet wired together (clearly commented at the point where it matters):**
-- Amount verification is only confirmed for six providers (telebirr, CBE PDF, CBE mobile JSON,
-  Zemen, Bank of Abyssinia, Awash) — the ones links.et's docs describe field-by-field. A receipt
-  from any other supported bank is still confirmed by the bank itself, but the booking flow
-  reports the amount as unverified (`amountVerified: false`) rather than guessing at field names
-  links.et hasn't documented yet.
-- If a verification takes unusually long (a busy or struggling bank), `/api/verify-receipt` can
-  return a `202 { pending: true }` after ~25s instead of a final result. The current frontend
-  doesn't retry on this automatically yet — that's the next piece to wire up.
-- Nothing in the frontend calls the new `/api/data/*` endpoints yet — profile, conversation,
-  quiz, and study-plan data are still only kept in frontend state/`localStorage`, not persisted
-  to Mongo, until the relevant pages are wired up to call them.
-- The Gemini test endpoint is real but isolated — nothing in the UI surfaces it yet; the
-  Assistant page talks to Voxide's own AI, not Gemini.
-- The two mentors' payment details in `mengede-web/src/data/mentors.js` (`pay.account`) are
-  placeholders — replace with their real Telebirr/bank numbers.
-- The Voxide agent's own instructions (persona, language, honesty rules) live in the Voxide
-  dashboard, not in this repo. Set them there, and add the production domain to the whitelist.
-- Amharic language setting is cosmetic — there's no translation layer behind it yet.
+**Still mocked or intentionally incomplete:**
+- Amount verification is only confirmed for the six provider formats documented in detail by links.et; other supported banks may report `amountVerified: false`.
+- A slow links.et verification can return `202 { pending: true }`; automatic frontend retry is not yet implemented.
+- Mentor payment account values in `mengede-web/src/data/mentors.js` remain placeholders and must be replaced with real payment details before accepting paid-session submissions.
+- Voxide persona/instructions live in the Voxide dashboard; the deployed domain must be whitelisted there. HTTPS is required for microphone access in production.
+- Amharic language selection changes the Voxide locale but does not yet provide a full application translation layer.

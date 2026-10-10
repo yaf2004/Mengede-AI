@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: mengede-ai
+    runtime: node
+    plan: free
+    buildCommand: npm ci --prefix mengede-server && npm ci --include=dev --prefix mengede-web && npm run build --prefix mengede-web
+    startCommand: npm start --prefix mengede-server
+    healthCheckPath: /api/health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: mengede_prod
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_EMBEDDING_MODEL
+        value: gemini-embedding-001
+      - key: LINKS_ET_API_KEY
+        sync: false
+      - key: LINKS_ET_BASE_URL
+        value: https://links.et
+      - key: KNOWLEDGE_INGEST_KEY
+        sync: false

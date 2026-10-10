@@ -9,6 +9,7 @@ const { Schema, model, models } = mongoose;
 const StudentProfileSchema = new Schema(
   {
     user_id: { type: String, required: true, unique: true, index: true },
+    name: String,
     stage: { type: String, required: true },
     grade: String,
     subjects: Schema.Types.Mixed,
